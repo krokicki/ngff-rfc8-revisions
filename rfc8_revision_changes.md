@@ -1,9 +1,10 @@
 # RFC-8 revision: summary of changes
 
 **Status:** Proposed revisions, Fall 2026
+
 **Scope:** Changes to RFC-8 (Collections and Extensibility) following the round-1 review, Damien Goutte-Gattat's extensibility proposal and Benedikt Best's comment in [ome/ngff#627](https://github.com/ome/ngff/pull/627).
 
-This document lists every change agreed for RFC-8 so that the RFC text can be updated. Each section states the new rule, what it replaces, and an example. Topics that move to separate sub-RFCs are listed at the end, along with points that still need wording.
+This document lists every change so that the RFC text can be updated. Each section states the new rule, what it replaces, and an example. Topics that move to separate sub-RFCs are listed at the end, along with points that still need wording.
 
 ---
 
