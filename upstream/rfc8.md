@@ -305,7 +305,7 @@ The `type` field of a `Node` is an extension point. For detail on how to extend 
 A `Node` object may be used as the root object of the `ome` key, in which case a `version` field, as defined in previous spec versions, is also required.
 Non-root `Node` objects SHOULD NOT have a `version` field and MUST NOT have a different `version` value than the root `Node`.
 
-(rfcs:rfc8:abstract-structure-attributes)=
+(rfcs:rfc8:abstract-structure-traits)=
 #### Traits
 
 Each `Node` has a `traits` field that can be populated with JSON metadata.
@@ -337,6 +337,7 @@ This is particularly useful for defining the nodes that are stored within a Zarr
             // Our `collection`-typed node attributes
             // are listed here
             "type": "collection",
+            "id": "01a1354d-7cd7-724f-96d6-29c9d60bbf28",
             "name": "zarr.json-example",
             "nodes": [...]
         }
@@ -358,6 +359,7 @@ Standalone files are useful for persisting groupings of images that may or may n
         // Our `collection`-typed node attributes
         // are listed here
         "type": "collection",
+        "id": "01a1354d-7cd7-7658-95d8-4f1e9cadc9c6",
         "name": "standalone-example",
         "nodes": [...]
     }
@@ -500,7 +502,7 @@ Either `"nodes"` or `"path"` MUST be present, but not both.
               "type": "zarr",
               "path": "./s0"
             },
-            "attributes": {
+            "traits": {
               ...
             }
           },
