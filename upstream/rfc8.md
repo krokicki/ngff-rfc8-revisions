@@ -143,6 +143,7 @@ illustrating individual aspects of the proposal, e.g.:
     "ome": {
         "version": "0.x",
         "type": "multiscale",
+        "id": "01a13520-b697-70c4-979b-b52c01fbbe30",
         "name": "our_first_example",
         "nodes": [
           {
@@ -274,8 +275,7 @@ only valid for a node in the context of a collection (e.g. rendering settings).
 
 This RFC defines a basic interface for an OME-Zarr metadata object, which we
 name `Node`. The [Node interface](#node) is a consistent JSON structure for
-several different types of OME-Zarr metadata object, where fields specific to
-the node type are inside an attributes field, and the root only stores
+several different types of OME-Zarr metadata object and the root only stores
 information used for identifying and referencing the object.
 
 (rfcs:rfc8:abstract-structure-node-schema)=
@@ -286,9 +286,9 @@ Objects that implement `Node` have the following fields:
 | Field | Type | Required? | Notes |
 | - | - | - | - |
 | `"type"` | string | yes | Value MUST be a string identifying the node type. |
-| `"id"` | string | no | Value MUST be a string that matches `[a-zA-Z0-9-_.]+`. IDs MUST be unique within the JSON document. |
-| `"name"` | string | yes | Value MUST be a non-empty string intended for human-readable display. Names MUST be unique within the enclosing collection. |
-| `"attributes"` | object | no | Value MUST be a dictionary. [See attributes section](#attributes) |
+| `"id"` | string | yes | Value MUST be a string that matches `[a-zA-Z0-9-_.]+`. Value MUST be a UUID. IDs MUST be unique within the JSON document. |
+| `"name"` | string | no | Value MUST be a non-empty string intended for human-readable display. Names MUST be unique within the enclosing collection. |
+| `"traits"` | object | no | Value MUST be a dictionary. [See traits section](#traits) |
 
 (rfcs:rfc8:abstract-structure-node-field-type)=
 
@@ -306,18 +306,18 @@ A `Node` object may be used as the root object of the `ome` key, in which case a
 Non-root `Node` objects SHOULD NOT have a `version` field and MUST NOT have a different `version` value than the root `Node`.
 
 (rfcs:rfc8:abstract-structure-attributes)=
-#### Attributes
+#### Traits
 
-Each `Node` has an `attributes` field that can be populated with JSON metadata.
-A primary use case for the `attributes` field is the specialization of collections and nodes through additional metadata.
+Each `Node` has a `traits` field that can be populated with JSON metadata.
+A primary use case for the `traits` field is the specialization of collections and nodes through additional metadata.
 
-Attribute keys that are defined as part of this RFC are:
+Traits that are defined as part of this RFC or sub-RFCs are:
 - `coordinateSystems`
 - `coordinateTransformations`
 - `labels`, as well as `labelValue` and `color` in label attributes
 - `plate`, `well`, `acquisition` for HCS metadata
 
-Attribute keys within the `attributes` dictionary of nodes are an extension point. Custom extensions can add prefixed keys (e.g., `neuroglancer:shader`, `webknossos:settings`). See [Extensions](#extensions) for more details.
+Trait keys within the `traits` dictionary of nodes are an extension point. Custom extensions can add prefixed keys (e.g., `neuroglancer:shader`, `webknossos:settings`). See [Extensions](#extensions) for more details.
 
 #### Metadata storage
 
@@ -391,11 +391,11 @@ also be absolute and point to remote storage.
 | Field | Type | Required? | Notes |
 | - | - | - | - |
 | `"type"` | string | yes | Value MUST be `"collection"`. |
-| `"id"` | string | no | Value MUST be a string that matches `[a-zA-Z0-9-_.]+`. IDs MUST be unique within the JSON document. |
-| `"name"` | string | yes | Value MUST be a non-empty string intended for human-readable display. Names MUST be unique within the enclosing collection. |
+| `"id"` | string | yes | Value MUST be a string that matches `[a-zA-Z0-9-_.]+`. Value MUST be a UUID. IDs MUST be unique within the JSON document. |
+| `"name"` | string | no | Value MUST be a non-empty string intended for human-readable display. Names MUST be unique within the enclosing collection. |
 | `"nodes"` | array | no | Value MUST be an array of `Node` objects. |
 | `"path"` | object | no | Value MUST be a `Path` object. |
-| `"attributes"` | object | no | Value MUST be a dictionary. [See attributes section](#attributes). |
+| `"traits"` | object | no | Value MUST be a dictionary. [See traits section](#traits). |
 
 Either `"nodes"` or `"path"` MUST be present, but not both.
 
@@ -404,6 +404,7 @@ Either `"nodes"` or `"path"` MUST be present, but not both.
   "ome": {
       "version": "0.x",
       "type": "collection",
+      "id": "01a13543-f211-74ac-b6d8-da304a733e68",
       "name": "proj_gallery",
       "nodes": [{
           "type": "collection",
@@ -475,11 +476,11 @@ This new interface replaces the multiscale metadata defined in the previous vers
 | Field | Type | Required? | Notes |
 | - | - | - | - |
 | `"type"` | string | yes | Value MUST be `"multiscale"`. |
-| `"id"` | string | no | Value MUST be a string that matches `[a-zA-Z0-9-_.]+`. IDs MUST be unique within the JSON document. |
-| `"name"` | string | yes | Value MUST be a non-empty string intended for human-readable display. Names MUST be unique within the enclosing collection. |
+| `"id"` | string | yes | Value MUST be a string that matches `[a-zA-Z0-9-_.]+`. Value MUST be a UUID. IDs MUST be unique within the JSON document. |
+| `"name"` | string | no | Value MUST be a non-empty string intended for human-readable display. Names MUST be unique within the enclosing collection. |
 | `"nodes"` | array | no | Value MUST be an array of `Singlescale` objects. |
 | `"path"` | object | no | Value MUST be a `Path` object. |
-| `"attributes"` | object | yes | Value MUST be a dictionary. [See attributes section](#attributes). Required because it MUST contain `coordinateSystems`.|
+| `"traits"` | object | yes | Value MUST be a dictionary. [See traits section](#traits). Required because it MUST contain `coordinateSystems`.|
 
 Either `"nodes"` or `"path"` MUST be present, but not both.
 
@@ -488,6 +489,7 @@ Either `"nodes"` or `"path"` MUST be present, but not both.
     "ome": {
         "version": "0.x",
         "type": "multiscale",
+        "id": "01a1354c-9611-72bb-b440-6db340b0f0bd",
         "name": "imagepyramid1",
         "nodes": [
           {
@@ -538,8 +540,8 @@ In a change from the previous specification, coordinate systems are referenced u
     "version": "0.x",
     "type": "collection",
     "name": "Tiles",
-    "id": "tiles",
-    "attributes": {
+    "id": "01a1354d-7cd7-78c5-bda9-cb72c508924d",
+    "traits": {
       "scene": {
         "coordinateSystems": [
           {
@@ -578,7 +580,7 @@ In a change from the previous specification, coordinate systems are referenced u
     "nodes": [
       {
         "type": "multiscale",
-        "id": "tile_0",
+        "id": "01a1354d-7cd7-70c1-ba68-99bbccce4122",
         "name": "Tile 0",
         "path": {
           "type": "zarr",
@@ -586,7 +588,7 @@ In a change from the previous specification, coordinate systems are referenced u
         }
       },
       {
-        "type": "multiscale",
+        "type": "01a1354d-7cd7-7dc3-b31d-f5f168a71e87",
         "id": "tile_1",
         "name": "Tile 1",
         "path": {
@@ -649,18 +651,18 @@ the following requirements apply:
   If the referenced coordinate system is in a different metadata document, both the `id` and `path` fields MUST be present.
 
 
-##### `Scene` attribute
+##### `Scene` trait
 
-The `scene` attribute MUST be an object with the following fields:
+The `scene` trait MUST be an object with the following fields:
 
 | Field | Type | Required? | Notes |
 | - | - | - | - |
 | `"coordinateSystems"` | array | no | Values MUST be valid instances of [`Coordinate System`](#coordinate-system-interface) objects. |
 | `"coordinateTransformations"` | array | yes | Values MUST be valid instances of [`Coordinate transformation`](#coordinate-transformation-interface) objects |
 
-A `scene` metadata object can be defined in the `attributes` of a collection to enrich the collection with spatial information of the nodes within the collection.
-The `scene` field allows to clearly distinguish between the spatial information pertaining to an individual multiscale image (which is stored in the `attributes` of the multiscale)
-and the spatial information pertaining to the collection of images (which is stored in the `attributes` of the collection).
+A `scene` metadata object can be defined in the `traits` of a collection to enrich the collection with spatial information of the nodes within the collection.
+The `scene` field allows to clearly distinguish between the spatial information pertaining to an individual multiscale image (which is stored in the `traits` of the multiscale)
+and the spatial information pertaining to the collection of images (which is stored in the `traits` of the collection).
 
 <!--
 These "new and modified core classes" could become concrete extensions
