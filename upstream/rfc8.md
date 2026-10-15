@@ -579,7 +579,7 @@ In a change from the previous specification, coordinate systems are referenced u
                 "type": "zarr",
                 "path": "./tile_1.zarr"
               },
-              "id": "01a13e05-943e-77e2-b23d-190a5c03f019"
+              "id": "01a13e05-943e-77e2-b23d-190a5c03f019"  // physical
             },  // references coordinate system "physical" defined in tile_1
             "output": {"id": "01a13e01-a07b-711a-9443-6b8fe29e8422"}  // references coordinate system "world" defined in same node
           }
