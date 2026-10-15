@@ -249,7 +249,7 @@ A reference MUST be an object with the following fields:
 
 | Field | Type | Required? | Notes |
 | - | - | - | - |
-| `"id"` | string | yes | Value MUST be a string that matches `[a-zA-Z0-9-_.]+`, MUST be a UUID, MUST be unique within the JSON document, and SHOULD be a UUIDv7+. |
+| `"id"` | string | yes | Value MUST be a UUID, MUST be unique within the JSON document, and SHOULD be a UUIDv7+. |
 | `"path"` | object | no | Value MUST be a `Path` object. |
 
 (rfcs:rfc8:reference-interface-field-path)=
@@ -286,7 +286,7 @@ Objects that implement `Node` have the following fields:
 | Field | Type | Required? | Notes |
 | - | - | - | - |
 | `"type"` | string | yes | Value MUST be a string identifying the node type. |
-| `"id"` | string | yes | Value MUST be a string that matches `[a-zA-Z0-9-_.]+`, MUST be a UUID, MUST be unique within the JSON document, and SHOULD be a UUIDv7+. |
+| `"id"` | string | yes | Value MUST be a UUID, MUST be unique within the JSON document, and SHOULD be a UUIDv7+. |
 | `"name"` | string | no | Value MUST be a non-empty string intended for human-readable display. Names MAY be unique within the enclosing collection. |
 | `"traits"` | object | no | Value MUST be a dictionary. [See traits section](#traits) |
 
@@ -393,7 +393,7 @@ also be absolute and point to remote storage.
 | Field | Type | Required? | Notes |
 | - | - | - | - |
 | `"type"` | string | yes | Value MUST be `"collection"`. |
-| `"id"` | string | yes | Value MUST be a string that matches `[a-zA-Z0-9-_.]+`, MUST be a UUID, MUST be unique within the JSON document, and SHOULD be a UUIDv7+. |
+| `"id"` | string | yes | Value MUST be a UUID, MUST be unique within the JSON document, and SHOULD be a UUIDv7+. |
 | `"name"` | string | no | Value MUST be a non-empty string intended for human-readable display. Names MAY be unique within the enclosing collection. |
 | `"nodes"` | array | no | Value MUST be an array of `Node` objects. |
 | `"path"` | object | no | Value MUST be a `Path` object. |
@@ -432,7 +432,7 @@ This new interface replaces the dataset metadata defined in the previous version
 | Field | Type | Required? | Notes |
 | - | - | - | - |
 | `"type"` | string | yes | Value MUST be `"singlescale"`. |
-| `"id"` | string | yes | Value MUST be a string that matches `[a-zA-Z0-9-_.]+`, MUST be a UUID, MUST be unique within the JSON document, and SHOULD be a UUIDv7+. |
+| `"id"` | string | yes | Value MUST be a UUID, MUST be unique within the JSON document, and SHOULD be a UUIDv7+. |
 | `"name"` | string | no | Value MUST be a non-empty string intended for human-readable display. Names MAY be unique within the enclosing collection. |
 | `"path"` | object | no | Value MUST be a `Path` object. |
 | `"attributes"` | object | yes | Value MUST be a dictionary. [See attributes section](#attributes). Required because it MUST contain `coordinateTransformations`.|
@@ -478,7 +478,7 @@ This new interface replaces the multiscale metadata defined in the previous vers
 | Field | Type | Required? | Notes |
 | - | - | - | - |
 | `"type"` | string | yes | Value MUST be `"multiscale"`. |
-| `"id"` | string | yes | Value MUST be a string that matches `[a-zA-Z0-9-_.]+`, MUST be a UUID, MUST be unique within the JSON document, and SHOULD be a UUIDv7+. |
+| `"id"` | string | yes | Value MUST be a UUID, MUST be unique within the JSON document, and SHOULD be a UUIDv7+. |
 | `"name"` | string | no | Value MUST be a non-empty string intended for human-readable display. Names MAY be unique within the enclosing collection. |
 | `"nodes"` | array | no | Value MUST be an array of `Singlescale` objects. |
 | `"path"` | object | no | Value MUST be a `Path` object. |
@@ -620,7 +620,7 @@ The `Coordinate System` objects have the following fields:
 
 | Field | Type | Required? | Notes |
 | - | - | - | - |
-| `"id"` | string | yes | Value MUST be a string that matches `[a-zA-Z0-9-_.]+`, MUST be a UUID, MUST be unique within the JSON document, and SHOULD be a UUIDv7+. |
+| `"id"` | string | yes | Value MUST be a UUID, MUST be unique within the JSON document, and SHOULD be a UUIDv7+. |
 | `"name"` | string | no | More descriptive name for the coordinate system, if needed. |
 | `"axes"` | array of strings | yes | Value MUST be an array of axes, as defined in RFC-5. |
 
@@ -769,21 +769,21 @@ A `collection` node representing a plate MUST have a `plate` attribute with the 
 
 | Field | Type | Required? | Notes |
 | - | - | - | - |
-| `"id"` | string | yes | Value MUST be a string that matches `[a-zA-Z0-9-_.]+`, MUST be a UUID, MUST be unique within the JSON document, and SHOULD be a UUIDv7+. |
+| `"id"` | string | yes | Value MUST be a UUID, MUST be unique within the JSON document, and SHOULD be a UUIDv7+. |
 | `"name"` | string | no | A human-readable name for the acquisition. |
 
 ##### `Column` interface
 
 | Field | Type | Required? | Notes |
 | - | - | - | - |
-| `"id"` | string | yes | Value MUST be a string that matches `[a-zA-Z0-9-_.]+`, MUST be a UUID, MUST be unique within the JSON document, and SHOULD be a UUIDv7+. |
+| `"id"` | string | yes | Value MUST be a UUID, MUST be unique within the JSON document, and SHOULD be a UUIDv7+. |
 | `"name"` | string | no | A human-readable name for the column. |
 
 ##### `Row` interface
 
 | Field | Type | Required? | Notes |
 | - | - | - | - |
-| `"id"` | string | yes | Value MUST be a string that matches `[a-zA-Z0-9-_.]+`, MUST be a UUID, MUST be unique within the JSON document, and SHOULD be a UUIDv7+. |
+| `"id"` | string | yes | Value MUST be a UUID, MUST be unique within the JSON document, and SHOULD be a UUIDv7+. |
 | `"name"` | string | no | A human-readable name for the row. |
 
 ##### `Well` attribute
