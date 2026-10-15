@@ -147,7 +147,7 @@ illustrating individual aspects of the proposal, e.g.:
         "name": "our_first_example",
         "nodes": [
           {
-            "id": "s0",
+            "id": "01a13da0-6c3b-7600-b6f5-4ef2414b2f14",
             "name": "s0",
             "type": "singlescale",
             "path": {
@@ -249,7 +249,7 @@ A reference MUST be an object with the following fields:
 
 | Field | Type | Required? | Notes |
 | - | - | - | - |
-| `"id"` | string | yes | Value MUST be a string that matches `[a-zA-Z0-9-_.]+`. |
+| `"id"` | string | yes | Value MUST be a string that matches `[a-zA-Z0-9-_.]+`, MUST be a UUID, MUST be unique within the JSON document, and SHOULD be a UUIDv7+. |
 | `"path"` | object | no | Value MUST be a `Path` object. |
 
 (rfcs:rfc8:reference-interface-field-path)=
@@ -286,8 +286,8 @@ Objects that implement `Node` have the following fields:
 | Field | Type | Required? | Notes |
 | - | - | - | - |
 | `"type"` | string | yes | Value MUST be a string identifying the node type. |
-| `"id"` | string | yes | Value MUST be a string that matches `[a-zA-Z0-9-_.]+`. Value MUST be a UUID. IDs MUST be unique within the JSON document. |
-| `"name"` | string | no | Value MUST be a non-empty string intended for human-readable display. Names MUST be unique within the enclosing collection. |
+| `"id"` | string | yes | Value MUST be a string that matches `[a-zA-Z0-9-_.]+`, MUST be a UUID, MUST be unique within the JSON document, and SHOULD be a UUIDv7+. |
+| `"name"` | string | no | Value MUST be a non-empty string intended for human-readable display. Names MAY be unique within the enclosing collection. |
 | `"traits"` | object | no | Value MUST be a dictionary. [See traits section](#traits) |
 
 (rfcs:rfc8:abstract-structure-node-field-type)=
@@ -393,8 +393,8 @@ also be absolute and point to remote storage.
 | Field | Type | Required? | Notes |
 | - | - | - | - |
 | `"type"` | string | yes | Value MUST be `"collection"`. |
-| `"id"` | string | yes | Value MUST be a string that matches `[a-zA-Z0-9-_.]+`. Value MUST be a UUID. IDs MUST be unique within the JSON document. |
-| `"name"` | string | no | Value MUST be a non-empty string intended for human-readable display. Names MUST be unique within the enclosing collection. |
+| `"id"` | string | yes | Value MUST be a string that matches `[a-zA-Z0-9-_.]+`, MUST be a UUID, MUST be unique within the JSON document, and SHOULD be a UUIDv7+. |
+| `"name"` | string | no | Value MUST be a non-empty string intended for human-readable display. Names MAY be unique within the enclosing collection. |
 | `"nodes"` | array | no | Value MUST be an array of `Node` objects. |
 | `"path"` | object | no | Value MUST be a `Path` object. |
 | `"traits"` | object | no | Value MUST be a dictionary. [See traits section](#traits). |
@@ -432,8 +432,8 @@ This new interface replaces the dataset metadata defined in the previous version
 | Field | Type | Required? | Notes |
 | - | - | - | - |
 | `"type"` | string | yes | Value MUST be `"singlescale"`. |
-| `"id"` | string | no | Value MUST be a string that matches `[a-zA-Z0-9-_.]+`. IDs MUST be unique within the JSON document. |
-| `"name"` | string | yes | Value MUST be a non-empty string intended for human-readable display. Names MUST be unique within the enclosing collection. |
+| `"id"` | string | yes | Value MUST be a string that matches `[a-zA-Z0-9-_.]+`, MUST be a UUID, MUST be unique within the JSON document, and SHOULD be a UUIDv7+. |
+| `"name"` | string | no | Value MUST be a non-empty string intended for human-readable display. Names MAY be unique within the enclosing collection. |
 | `"path"` | object | no | Value MUST be a `Path` object. |
 | `"attributes"` | object | yes | Value MUST be a dictionary. [See attributes section](#attributes). Required because it MUST contain `coordinateTransformations`.|
 
@@ -453,7 +453,7 @@ This new interface replaces the dataset metadata defined in the previous version
   "ome": {
     "version": "0.x",
     "type": "singlescale",
-    "id": "s0",
+    "id": "01a13da8-7b6e-7030-ac88-b8013ef53020",
     "name": "s0",
     "path": {
       "type": "zarr",
@@ -478,8 +478,8 @@ This new interface replaces the multiscale metadata defined in the previous vers
 | Field | Type | Required? | Notes |
 | - | - | - | - |
 | `"type"` | string | yes | Value MUST be `"multiscale"`. |
-| `"id"` | string | yes | Value MUST be a string that matches `[a-zA-Z0-9-_.]+`. Value MUST be a UUID. IDs MUST be unique within the JSON document. |
-| `"name"` | string | no | Value MUST be a non-empty string intended for human-readable display. Names MUST be unique within the enclosing collection. |
+| `"id"` | string | yes | Value MUST be a string that matches `[a-zA-Z0-9-_.]+`, MUST be a UUID, MUST be unique within the JSON document, and SHOULD be a UUIDv7+. |
+| `"name"` | string | no | Value MUST be a non-empty string intended for human-readable display. Names MAY be unique within the enclosing collection. |
 | `"nodes"` | array | no | Value MUST be an array of `Singlescale` objects. |
 | `"path"` | object | no | Value MUST be a `Path` object. |
 | `"traits"` | object | yes | Value MUST be a dictionary. [See traits section](#traits). Required because it MUST contain `coordinateSystems`.|
@@ -495,7 +495,7 @@ Either `"nodes"` or `"path"` MUST be present, but not both.
         "name": "imagepyramid1",
         "nodes": [
           {
-            "id": "s0",
+            "id": "01a13daa-329c-7242-9610-af256d94c029",
             "name": "s0",
             "type": "singlescale",
             "path": {
@@ -527,8 +527,15 @@ Coordinate systems and transformations can be stored in two distinct locations:
     {
       "type": "translation",
       "translation": [0, 0, 100],
-      "input": {"id": "physical", "path": "./image_1"}, // references collection node ID
-      "output": {"id": "world"} // references coordinate system ID
+      "input": {
+        "id": "01a13dae-bfca-77db-9ee9-7d0de8967ff3",
+        "name": "physical",
+        "path": "./image_1"  // references collection node
+      },
+      "output": {
+        "id": "01a13e01-a07b-711a-9443-6b8fe29e8422", // references coordinate system ID
+        "name": "world"
+      }
     }
   ]
 }
@@ -547,7 +554,7 @@ In a change from the previous specification, coordinate systems are referenced u
       "scene": {
         "coordinateSystems": [
           {
-            "id": "world",
+            "id": "01a13e01-a07b-711a-9443-6b8fe29e8422",  // world
             "axes": [...]
           }
         ],
@@ -560,9 +567,9 @@ In a change from the previous specification, coordinate systems are referenced u
                 "type": "zarr",
                 "path": "./tile_0.zarr"
               },
-              "id": "physical"
+              "id": "01a13dae-bfca-77db-9ee9-7d0de8967ff3"  // physical
             },  // references coordinate system "physical" defined in tile_0
-            "output": {"id": "world"}  // references coordinate system "world" defined in same node
+            "output": {"id": "01a13e01-a07b-711a-9443-6b8fe29e8422"}  // references coordinate system "world" defined in same node
           },
           {
             "type": "translation",
@@ -572,9 +579,9 @@ In a change from the previous specification, coordinate systems are referenced u
                 "type": "zarr",
                 "path": "./tile_1.zarr"
               },
-              "id": "physical"
+              "id": "01a13e05-943e-77e2-b23d-190a5c03f019"
             },  // references coordinate system "physical" defined in tile_1
-            "output": {"id": "world"}  // references coordinate system "world" defined in same node
+            "output": {"id": "01a13e01-a07b-711a-9443-6b8fe29e8422"}  // references coordinate system "world" defined in same node
           }
         ]
       }
@@ -590,8 +597,8 @@ In a change from the previous specification, coordinate systems are referenced u
         }
       },
       {
-        "type": "01a1354d-7cd7-7dc3-b31d-f5f168a71e87",
-        "id": "tile_1",
+        "type": "multiscale",
+        "id": "01a1354d-7cd7-7dc3-b31d-f5f168a71e87",
         "name": "Tile 1",
         "path": {
           "type": "zarr",
@@ -613,7 +620,7 @@ The `Coordinate System` objects have the following fields:
 
 | Field | Type | Required? | Notes |
 | - | - | - | - |
-| `"id"` | string | yes | Value MUST be a string that matches `[a-zA-Z0-9-_.]+`. ID to use when referencing the coordinate system from a transformation. IDs MUST be unique within the JSON document. |
+| `"id"` | string | yes | Value MUST be a string that matches `[a-zA-Z0-9-_.]+`, MUST be a UUID, MUST be unique within the JSON document, and SHOULD be a UUIDv7+. |
 | `"name"` | string | no | More descriptive name for the coordinate system, if needed. |
 | `"axes"` | array of strings | yes | Value MUST be an array of axes, as defined in RFC-5. |
 
@@ -635,8 +642,8 @@ Depending on the context, different fields are required:
 
 | Context | `input` | `output` |
 | - | - | - |
-| **scene** | {"id": "imageA", "name": "physical" } | { "id": "imageB", "name": "physical" } |
-| **Multiscale > attributes > coordinateTransformations** | { "id": "scale0"} | { "id": "image", "name": "physical" } |
+| **scene** | {"id": "01a13e16-c6d6-7057-8a73-7d977c754ea3", "name": "physical" } | { "id": "01a13e16-ff87-701f-a77e-b357eca9fd64", "name": "physical" } |
+| **Multiscale > attributes > coordinateTransformations** | { "id": "01a13e17-4776-72aa-8a9a-f1101d555fc2"} | { "id": "01a13e17-9425-7457-b728-9b545e3bf661", "name": "physical" } |
 
 **Multiscale > attributes > coordinateTransformations**: In the context of multiscales transformations, the following requirements apply:
 - The `input` field MUST reference a [singlescale node](#singlescale-node).
@@ -716,7 +723,7 @@ The previous `label-value` key is now renamed to `labelValue` for consistency.
         "name": "label-example",
         "attributes": { ... },
         "nodes": [{
-            "id": "raw",
+            "id": "01a13e24-04a8-7121-8961-b01fa9d5198f",
             "name": "raw",
             "type": "multiscale",
             "nodes": [ ... ]
@@ -726,7 +733,7 @@ The previous `label-value` key is now renamed to `labelValue` for consistency.
             "nodes": [ ... ],
             "attributes": {
                 "labels": {
-                    "source": [ {"id": "raw"} ],
+                    "source": [{"id": "01a13e24-04a8-7121-8961-b01fa9d5198f"}],
                     "labelAttributes": [{
                         "labelValue": 1,
                         "color": [ 255, 0, 0, 255 ]
@@ -746,7 +753,7 @@ The previous `label-value` key is now renamed to `labelValue` for consistency.
 High-content screening data is typically organized as a grid of wells on a plate, where each well contains one or more multiscale images from one or more acquisition rounds.
 This section introduces additional metadata for organizing wells on a plate.
 
-This proposal changes the HCS references from numeric IDs and names to string-based ID references, consistent with the [References mechanism](#reference-interface) defined above.
+This proposal changes the HCS references from numeric IDs and names to UUID-based references, consistent with the [References mechanism](#reference-interface) defined above.
 
 ##### `Plate` attribute
 
@@ -762,21 +769,21 @@ A `collection` node representing a plate MUST have a `plate` attribute with the 
 
 | Field | Type | Required? | Notes |
 | - | - | - | - |
-| `"id"` | string | yes | Value MUST be a string that matches `[a-zA-Z0-9-_.]+`. IDs MUST be unique within the JSON document. |
+| `"id"` | string | yes | Value MUST be a string that matches `[a-zA-Z0-9-_.]+`, MUST be a UUID, MUST be unique within the JSON document, and SHOULD be a UUIDv7+. |
 | `"name"` | string | no | A human-readable name for the acquisition. |
 
 ##### `Column` interface
 
 | Field | Type | Required? | Notes |
 | - | - | - | - |
-| `"id"` | string | yes | Value MUST be a string that matches `[a-zA-Z0-9-_.]+`. IDs MUST be unique within the JSON document. |
+| `"id"` | string | yes | Value MUST be a string that matches `[a-zA-Z0-9-_.]+`, MUST be a UUID, MUST be unique within the JSON document, and SHOULD be a UUIDv7+. |
 | `"name"` | string | no | A human-readable name for the column. |
 
 ##### `Row` interface
 
 | Field | Type | Required? | Notes |
 | - | - | - | - |
-| `"id"` | string | yes | Value MUST be a string that matches `[a-zA-Z0-9-_.]+`. IDs MUST be unique within the JSON document. |
+| `"id"` | string | yes | Value MUST be a string that matches `[a-zA-Z0-9-_.]+`, MUST be a UUID, MUST be unique within the JSON document, and SHOULD be a UUIDv7+. |
 | `"name"` | string | no | A human-readable name for the row. |
 
 ##### `Well` attribute
@@ -1313,16 +1320,17 @@ proposal. Further example can be found under
 https://github.com/normanrz/ngff-rfc8-collection-examples/.
 
 ### A multiscale group with a single, inlined resolution level
+
 ```jsonc
 {
     "ome": {
         "version": "0.x",
         "type": "multiscale",
         "name": "multiscales_example",
-        "id": "image_0",
+        "id": "01a13e2d-61b2-7760-9c2a-1aef3d3eeed6",
         "nodes": [
           {
-            "id": "s0",
+            "id": "01a13e2d-8ae2-7519-a28f-7b278247ca30",
             "name": "s0",
             "type": "singlescale",
             "path": {
@@ -1334,8 +1342,8 @@ https://github.com/normanrz/ngff-rfc8-collection-examples/.
                 {
                   "type": "scale",
                   "scale": [1, 1, 1],
-                  "input": {"id": "s0"},
-                  "output": {"id": "physical"}
+                  "input": {"id": "01a13e2d-8ae2-7519-a28f-7b278247ca30"},
+                  "output": {"id": "01a13e2f-a19f-7735-9802-e48c70b1a089"}
                 }
               ]
             }
@@ -1344,7 +1352,8 @@ https://github.com/normanrz/ngff-rfc8-collection-examples/.
         "attributes": {
           "coordinateSystems": [
             {
-              "id": "physical",
+              "id": "01a13e2f-a19f-7735-9802-e48c70b1a089",
+              "name": "physical",
               "axes": [...]
             }
           ]
@@ -1362,10 +1371,10 @@ The multiscale group contains the following metadata:
         "version": "0.x",
         "type": "multiscale",
         "name": "multiscales_example",
-        "id": "image_0",
+        "id": "01a13e3b-e9c3-71f4-b779-b8a7caf680cf",
         "nodes": [
           {
-            "id": "s0",
+            "id": "01a13e3c-13a5-7461-b9ba-3393039199b6",
             "name": "s0",
             "type": "singlescale",
             "path": {
@@ -1377,8 +1386,8 @@ The multiscale group contains the following metadata:
         "attributes": {
           "coordinateSystems": [
             {
-              "id": "physical",
-              "name": "The physical coordinate system",
+              "id": "01a13e3c-4f9e-760c-87bc-61b13430de55",
+              "name": "physical",
               "axes": [...]
             }
           ]
@@ -1394,15 +1403,15 @@ And the `zarr.json` at the location of the resolution level (`./s0/zarr.json`) c
         "version": "0.x",
         "type": "singlescale",
         "name": "s0",
-        "id": "s0",
+        "id": "01a13e3f-d53c-727d-bfc2-93269cae5f3a",
         "attributes": {
           "coordinateTransformations": [
             {
               "type": "scale",
               "scale": [1, 1, 1],
-              "input": {"id": "s0"},
+              "input": {"id": "01a13e3c-13a5-7461-b9ba-3393039199b6"},
               "output": {
-                "id": "physical",
+                "id": "01a13e3c-4f9e-760c-87bc-61b13430de55",
                 "path": {
                   "type": "json",
                   "path": "../zarr.json"
@@ -1455,6 +1464,7 @@ And the `zarr.json` at the location of the resolution level (`./s0/zarr.json`) c
 
 
 ### A collection with an inlined multiscale
+
 ```jsonc
 {
     "ome": {
@@ -1464,11 +1474,11 @@ And the `zarr.json` at the location of the resolution level (`./s0/zarr.json`) c
         "nodes": [
           {
             "name": "raw",
-            "id": "raw",
+            "id": "01a13e40-df14-7774-aafd-aa1a8defcfdd",
             "type": "multiscale",
             "nodes": [
               {
-                "id": "raw_0",
+                "id": "01a13e41-0673-7318-96ca-f56480904ce0",
                 "name": "raw_0",
                 "type": "singlescale",
                 "path": {
@@ -1482,13 +1492,14 @@ And the `zarr.json` at the location of the resolution level (`./s0/zarr.json`) c
                 {
                   "type": "scale",
                   "scale": [1, 1, 1],
-                  "input": {"id": "raw_0"},
-                  "output": {"id": "physical"}
+                  "input": {"id": "01a13e41-0673-7318-96ca-f56480904ce0"},
+                  "output": {"id": "01a13e41-6a7e-77e5-aa09-f0017d392a6b"}
                 }
               ],
               "coordinateSystems": [
                 {
-                  "id": "physical",
+                  "id": "01a13e41-6a7e-77e5-aa09-f0017d392a6b",
+                  "name": "physical",
                   "axes": [...]
                 }
               ]
