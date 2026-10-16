@@ -327,14 +327,13 @@ Non-root `Node` objects SHOULD NOT have a `version` field and MUST NOT have a di
 (rfcs:rfc8:abstract-structure-traits)=
 #### Traits
 
-Each `Node` has a `traits` field that can be populated with JSON metadata.
-A primary use case for the `traits` field is the specialization of collections and nodes through additional metadata.
+Each `Node` has a `traits` field that accepts a list of `Trait` objects. A trait is an object that can be used to enrich any `Node` with arbitrary metadata. A primary use case for traits is the specialization of collections and nodes.
 
-Traits that are defined as part of this RFC or sub-RFCs are:
-- `coordinateSystems`
-- `coordinateTransformations`
+Each trait has minimally a `type` field, which dictates how the trait should be interpreted and defines the other fields it may contain.
 
-Trait keys within the `traits` dictionary of nodes are an extension point. Custom extensions can add prefixed keys (e.g., `neuroglancer:shader`, `webknossos:settings`). See [Extensions](#extensions) for more details.
+This RFC defines one type of trait: [`scene`](#scene-trait).
+
+Trait types are also an extension point, so any extension can define its own traits following the rules set forth in the [“Extensions” section](#extensions).
 
 #### Metadata storage
 
@@ -689,36 +688,52 @@ under Damien's proposal
 
 ## Extensions
 
-This section describes how existing classes and class attributes can be extended
-in a controlled manner, enabling custom functionality while maintaining interoperability.
+This section describes an extensibility mechanism by which anyone can unilateraly extend the OME-Zarr specification and store, under the `ome` attributes in the `zarr.json` file, additional metadata that were not envisioned by the specification, all the while maintaining interoperability with OME-Zarr applications.
 
-Extensions to the specification can be made at defined extension points, and
-they are declared using a prefix naming scheme.
+The basic principle is that an extension compliant with this extensibility mechanism can extend the specification by **defining additional, custom types**. An OME-Zarr extension is therefore essentially a set of custom types.
+
+Note: We acknowledge that, since most if not all OME-Zarr implementations are inherently “permissive” (in that they will silently ignore anything that they don’t recognize or don’t expect within a `zarr.json` file), it is already possible for anyone to store additional metadata and create _de facto_ their own extension of OME-Zarr. However, without adhering to the rules of an established extensibility mechanism, such extensions do not provide any guarantee of interoperability. In the rest of this document, the word “extension” will be understood as referring strictly to “an extension compliant with the proposed extensibility mechanism”, ignoring all other possibilities of extensions.
+
+### Extension and custom type identifiers
+
+An extension MUST have a unique identifier, which SHOULD be an absolute URI that SHOULD end with either `#` or `/`.
+
+All custom types defined by an extension MUST have their own unique identifier, which MUST be built by appending a type-specific suffix (the type’s name, within the context of the extension that defines it) to the extension’s identifier.
+
+> For example, if an extension with the identifier `https://example.org/my-ngff-extension/` defined a new type of coordinate transformation named `NonLinearTransform`, the identifier for the new type would be `https://example.org/my-ngff-extension/NonLinearTransform`.
 
 ### Extension points
 
-The extension system defines several points at which OME-Zarr can be extended
-while maintaining a common framework. These include node types, attribute keys,
-path types, coordinate transformation types, and coordinate system axis
-types. Each extension point is identified and declared in the
-corresponding sections of this proposal.
+Custom types can be used in lieu of existing types defined by the specification, at defined extension points.
 
+An extension point is a `type` field within an object where (1) the value of the `type` field dictates how the rest of the object is to be interpreted, and (2) the OME-Zarr specification explicitly states that the allowed values in the `type` field “MAY be extended” (exact phrasing does not matter as long as the intention is clear).
 
-### Naming scheme
+At such an extension point, a custom type may be used by specifying its identifier in the `type` field, in lieu of one the values allowed by the specification. The custom type, as defined by the extension it belongs to, will then dictate how the object is to be interpreted.
 
-Extension identifiers follow a prefixed vs unprefixed convention:
+For example, the [`Path` interface](#path-interface) proposed by this very RFC has an extension point: it has a `type` field defined as accepting two values (`zarr` and `json`); the value dictates how the entire `Path` object is to be interpreted; and the specification explicitly states it is an extension point. An extension could then define a new, custom type of `Path` object.
 
-- **Unprefixed identifiers** are reserved for the core specification and can only be added or modified through the RFC process.
-- **Prefixed identifiers** (separated by `:`) can be freely introduced by custom extensions without requiring an RFC. The prefix identifies the user or organization that introduces and maintains the extension. Prefixes SHOULD be registered in a central registry (a Github repository under the `ome` organization). Registration of a prefix claims maintainership for that prefix and provides a discoverable location for the specification of custom extensions.
-- The `ome:` prefix is reserved for official extensions that have not yet been incorporated into the core specification.
+### Extension manifest
 
-This naming scheme applies uniformly to all extension points. Implementations that do not recognize a prefixed extension point SHOULD treat the referenced value as opaque and MAY skip it or display it with a generic representation.
+Any `zarr.json` file that makes use of extension-defined custom types MUST declare an extension manifest, which MUST list every extension used within the file. The manifest is stored under the `extensionManifest` key of the `ome` object.
 
-Custom-prefixed keys can also be used to add additional sub-keys or behavior to existing unprefixed keys.
-This can be thought of as a way of achieving inheritance.
-For example, the `well` key in a `Node`'s `attributes` could be specialized by a `fractal:well` key that adds additional sub-keys or alters behavior.
-It is out-of-scope of this RFC to fully define the inheritance behavior.
-That is left to be defined on a case-by-case basis for individual key specifications and may be standardized in a future RFC.
+The manifest MUST be an array of extension objects. Each listed extension MUST be an object with the following fields:
+
+| Field | Type | Required? | Notes |
+| - | - | - | - |
+| `"id"` | string | yes | Identifier for the extension. SHOULD be an absolute URI. MUST be unique within the manifest. |
+| `"version"` | string | yes | Version of the extension used in the document. |
+| `"name"` | string | no | Short human-readable name, for display. |
+| `"description"` | string | no | One-sentence human-readable description of the extension. |
+| `"mustUnderstand"` | boolean | no | Whether knowledge of this extension is required for faithful processing of the data. Default `false`. |
+| `"homepage"` | string | no | URL to a homepage or documentation page for the extension. |
+| `"schemas"` | list[Schema] | yes | Formal schemas describing the custom types defined by the extension. |
+
+Each item in the `schemas` list MUST be an object with the following fields:
+
+| Field | Type | Required? | Notes |
+| - | - | - | - |
+| `"type"` | string | yes | Value MUST be either `linkml` or `jsonschema`. |
+| `"url"` | string | yes | A URL pointing to the schema. |
 
 ### Examples
 
