@@ -383,6 +383,68 @@ Standalone files are useful for persisting groupings of images that may or may n
 }
 ```
 
+(rfcs:rfc8:metadata-storage-consolidated)=
+##### Consolidated metadata (non-normative)
+
+This section is non-normative.
+
+Resolving a tree of path-referenced nodes requires fetching the `zarr.json` of each referenced Zarr group (see [Performance](#performance)).
+To reduce the number of requests, writers MAY use [Zarr consolidated metadata](https://github.com/zarr-developers/zarr-specs/pull/309) to bundle the `zarr.json` documents of referenced nodes into the `zarr.json` of the root group.
+A reader that supports consolidated metadata can then load the whole tree in a single request.
+This also applies to nested collections: their `zarr.json` documents may be consolidated into the root, while they remain separate documents with their own `ome` metadata.
+
+```jsonc
+{
+  // zarr.json of the root group
+    "zarr_format": 3,
+    "node_type": "group",
+    "attributes": {
+        "ome": {
+            "version": "0.x",
+            "type": "collection",
+            "id": "01a1354d-7cd7-724f-96d6-29c9d60bbf28",
+            "name": "consolidated-example",
+            "nodes": [
+                {
+                    "type": "multiscale",
+                    "id": "01a1354d-7cd7-7a1e-8f3c-2b6d4e5f7a81",
+                    "name": "image",
+                    "path": { "type": "zarr", "path": "./image" }
+                }
+            ]
+        }
+    },
+    "consolidated_metadata": {
+        "kind": "inline",
+        "must_understand": false,
+        "metadata": {
+            "image": {
+                // copy of ./image/zarr.json
+                "zarr_format": 3,
+                "node_type": "group",
+                "attributes": { "ome": { ... } }
+            },
+            "image/s0": {
+                // copy of ./image/s0/zarr.json
+                "zarr_format": 3,
+                "node_type": "array",
+                ...
+            }
+        }
+    }
+}
+```
+
+The individual `zarr.json` files remain the source of truth.
+The consolidated copy is only a cache, and it can go stale when a referenced node is modified without updating the root.
+Keeping the cache consistent with the individual files would require an external transaction system, such as [Icechunk](https://icechunk.io) or a custom database.
+
+Consolidated metadata is a pure Zarr mechanism, and this RFC adds no OME-specific rules to it.
+Readers that do not support consolidated metadata fetch the `zarr.json` of each referenced node as usual.
+Consolidated metadata can only cover Zarr nodes within the hierarchy of the root group; standalone JSON files and nodes outside the root group are always fetched individually.
+
+At the time of writing, the Zarr-level specification of consolidated metadata is incomplete, which limits what this RFC can say about it.
+A future revision may give more guidance once the Zarr specification is finalized.
 
 ### New and modified core classes
 
@@ -1734,7 +1796,9 @@ merely provides additional information.
 
 ## Performance
 
-**Multiple requests to collect metadata.** Assembling a collection from path-referenced nodes requires one metadata request per node (fetching the `zarr.json` of each referenced Zarr group or the standalone JSON file). For large collections or high-latency storage backends (e.g. S3, HTTP), this can result in significant startup latency. Implementations MAY mitigate this by fetching node metadata in parallel and SHOULD consider caching resolved node metadata. Future RFCs may introduce a consolidated metadata format to reduce round trips.
+**Multiple requests to collect metadata.** Assembling a collection from path-referenced nodes requires one metadata request per node (fetching the `zarr.json` of each referenced Zarr group or the standalone JSON file). For large collections or high-latency storage backends (e.g. S3, HTTP), this can result in significant startup latency. Implementations MAY mitigate this by fetching node metadata in parallel and SHOULD consider caching resolved node metadata.
+Writers MAY additionally use Zarr consolidated metadata to bundle the `zarr.json` documents of referenced nodes into the root group, so that readers can load the whole tree in one request (see [Consolidated metadata](#consolidated-metadata-non-normative)).
+The individual `zarr.json` files remain the source of truth.
 
 <!--
 What impact will this proposal have on performance? What benchmarks should we
