@@ -390,6 +390,7 @@ This section is non-normative.
 
 Resolving a tree of path-referenced nodes requires fetching the `zarr.json` of each referenced Zarr group (see [Performance](#performance)).
 To reduce the number of requests, writers MAY use [Zarr consolidated metadata](https://github.com/zarr-developers/zarr-specs/pull/309) to bundle the `zarr.json` documents of referenced nodes into the `zarr.json` of the root group.
+Consolidated metadata stores a copy of the `zarr.json` of every group and array below the root group as a flat mapping, keyed by the path relative to the root group.
 A reader that supports consolidated metadata can then load the whole tree in a single request.
 This also applies to nested collections: their `zarr.json` documents may be consolidated into the root, while they remain separate documents with their own `ome` metadata.
 
@@ -437,6 +438,7 @@ This also applies to nested collections: their `zarr.json` documents may be cons
 
 The individual `zarr.json` files remain the source of truth.
 The consolidated copy is only a cache, and it can go stale when a referenced node is modified without updating the root.
+Readers that support consolidated metadata use the consolidated copy when it is present, so they see outdated metadata until the root is consolidated again.
 Keeping the cache consistent with the individual files would require an external transaction system, such as [Icechunk](https://icechunk.io) or a custom database.
 
 Consolidated metadata is a pure Zarr mechanism, and this RFC adds no OME-specific rules to it.
