@@ -152,7 +152,8 @@ illustrating individual aspects of the proposal, e.g.:
             "type": "singlescale",
             "path": {
               "type": "zarr",
-              "path": "./s0"
+              "format": "relative",
+              "href": "./s0"
             },
           }
         ]
@@ -202,7 +203,8 @@ used to build up the definition of an image.
 ```jsonc
     "path": {
         "type": "zarr",
-        "path": "./s0"
+        "format": "relative",
+        "href": "./s0"
     }
 ```
 
@@ -212,7 +214,8 @@ used to build up the definition of an image.
 | Field | Type | Required? | Notes |
 | - | - | - | - |
 | `"type"` | string | yes | Value MUST be a valid path type. |
-| `"path"` | string | yes | Value MUST be a string containing a path. See below. |
+| `"format"` | string | yes | Value MUST be a valid path format. See below. |
+| `"href"` | string | yes | Value MUST be a string containing a path in the declared `format`. See below. |
 
 (rfcs:rfc8:path-interface-field-type)=
 ##### Field: `type`
@@ -226,35 +229,53 @@ The `type` field of a `Path` object defines how the path is interpreted. This RF
 
 The `type` field of a `Path` object is an extension point. For detail on how to extend the `type` field with new values, see [Extensions](#extensions).
 
-(rfcs:rfc8:path-interface-field-path)=
-##### Field: `path`
+(rfcs:rfc8:path-interface-field-format)=
+##### Field: `format`
 
-The `path` string can be one of the following types:
+The `format` field of a `Path` object declares how the `href` string is to be interpreted.
+Implementations MUST use the `format` field to interpret the `href` and MUST NOT infer the format from the `href` string itself (e.g. from a `file://` or `https://` prefix).
 
-- **Relative paths.**
-  To reference nodes that are on the same file system namespace as the json file describing the collection, relative paths may be used.
-  Relative paths are interpreted relative to the json file describing the collection.
-  Relative paths follow the relative path notation defined in [IETF RFC1808](https://datatracker.ietf.org/doc/html/rfc1808).
+The following path formats are defined:
+
+| Format | Defined in | Description |
+| - | - | - |
+| `"relative"` | this RFC | A path relative to the metadata document that contains the `Path` object. |
+
+Only `relative` is a core path format of this RFC.
+Implementations that do not support the declared `format` MUST NOT attempt to resolve the path and SHOULD treat the referenced node as unavailable.
+
+Future RFCs may propose additional path formats, such as S3 URLs or chained paths (e.g. for referencing files within a zip file).
+
+(rfcs:rfc8:path-interface-field-href)=
+##### Field: `href`
+
+The `href` string locates the referenced document in the declared `format`.
+This RFC defines the rules for `href` values with the `relative` format only.
+
+- Relative paths are resolved from the location of the metadata document that contains the `Path` object,
+  i.e. from the Zarr group whose `zarr.json` contains it, or from the directory of the standalone JSON file that contains it.
+- Relative paths follow the relative path notation defined in [IETF RFC1808](https://datatracker.ietf.org/doc/html/rfc1808).
   Briefly, `.` and `..` are used to navigate the hierarchy and the hierarchy is separated by `/`.
-  Relative paths may be used for data stored on traditional file systems as well as other storage protocols, such as HTTP or S3.
-  Examples:
-  - `./image.ome.zarr`
-  - `../image.ome.zarr`
-- **Absolute file paths.**
-  On traditional file systems, absolute paths may be used with the `file` scheme as specified by [IETF RFC8089](https://datatracker.ietf.org/doc/html/rfc8089).
-  Please note that absolute file paths are generally not portable across operating systems or file systems.
-  Examples:
-  - `file:///home/user/data/image.ome.zarr`
-  - `file://C:/Users/user/data/image.ome.zarr`
-- **HTTP(S) URLs.**
-  To reference nodes that are stored remotely, URLs with the `http` or `https` scheme may be used.
-  URLs follow the notation defined in [IETF RFC1738](https://datatracker.ietf.org/doc/html/rfc1738).
-  Examples:
-  - `https://example.com/image.ome.zarr`
-  - `http://example.com/image.ome.zarr`
+- Relative paths may be used for data stored on traditional file systems as well as other storage protocols, such as HTTP or S3.
+  The storage protocol is determined by how the containing document was accessed, not by the `href`.
 
-Future RFCs may propose additional path types, such as S3 URLs or chained paths (e.g. for referencing files within a zip file).
+Examples:
+- `./image.ome.zarr`
+- `../image.ome.zarr`
+- `./registered/em.ome.zarr`
+- `s0`
+
 See the [Security](#security) section for guidance on access restrictions.
+
+(rfcs:rfc8:path-interface-resolution)=
+##### Path resolution
+
+Resolving a node's `path` means loading the document it locates, and, if the root node of that document has child nodes with a `path`, resolving those in turn.
+Resolving node paths MUST NOT form a cycle: a node's `path` MUST NOT resolve to a document that contains that node, directly or through a chain of other node paths.
+Implementations MUST detect cycles and MUST stop resolving and report an error when they encounter one.
+
+This rule applies to the `path` fields of nodes.
+The `path` field of a [`Reference`](#reference-interface) only locates the document that contains the referenced object and MAY point back to an enclosing document, e.g. from a resolution level to the coordinate systems of its multiscale.
 
 (rfcs:rfc8:declaration-interface)=
 #### `Declaration` interface
@@ -293,7 +314,7 @@ A reference to a coordinate system that is declared in another document:
 ```jsonc
 "input": {
   "type": "coordinate_system",
-  "path": { "type": "zarr", "path": "./raw" },
+  "path": { "type": "zarr", "format": "relative", "href": "./raw" },
   "ref": "physical"
 }
 ```
@@ -456,7 +477,7 @@ This also applies to nested collections: their `zarr.json` documents may be cons
                     "type": "multiscale",
                     "id": "01a1354d-7cd7-7a1e-8f3c-2b6d4e5f7a81",
                     "name": "image",
-                    "path": { "type": "zarr", "path": "./image" }
+                    "path": { "type": "zarr", "format": "relative", "href": "./image" }
                 }
             ]
         }
@@ -510,8 +531,7 @@ images, including segmentations, prediction maps and other derived images as
 well as other data types ("nodes"). Collections can be nested. Collections can
 have metadata attached. Within collections, nodes can also have metadata, which
 complements or overrides the nodes' own metadata. Nodes within collections are
-referenced by paths instead of relying on a file system hierarchy. Paths may
-also be absolute and point to remote storage.
+referenced by paths instead of relying on a file system hierarchy.
 
 (rfcs:rfc8:collection-node-schema)=
 ##### Schema
@@ -527,6 +547,8 @@ also be absolute and point to remote storage.
 
 Either `"nodes"` or `"path"` MUST be present, but not both.
 
+If `"path"` is present, the document it resolves to MUST have a root node of type `collection`.
+
 ```jsonc
 {
   "ome": {
@@ -539,7 +561,8 @@ Either `"nodes"` or `"path"` MUST be present, but not both.
           "name": "gallery1",
           "path": {
             "type": "json",
-            "path": "../gallery.json"
+            "format": "relative",
+            "href": "../gallery.json"
           }
       }, ...]
   }
@@ -583,7 +606,8 @@ This new interface replaces the dataset metadata defined in the previous version
     "name": "s0",
     "path": {
       "type": "zarr",
-      "path": "./s0"
+      "format": "relative",
+      "href": "./s0"
     },
     "attributes": {
       ...
@@ -612,6 +636,8 @@ This new interface replaces the multiscale metadata defined in the previous vers
 
 Either `"nodes"` or `"path"` MUST be present, but not both.
 
+If `"path"` is present, the document it resolves to MUST have a root node of type `multiscale`.
+
 ```jsonc
 {
     "ome": {
@@ -626,7 +652,8 @@ Either `"nodes"` or `"path"` MUST be present, but not both.
             "type": "singlescale",
             "path": {
               "type": "zarr",
-              "path": "./s0"
+              "format": "relative",
+              "href": "./s0"
             },
             "traits": {
               ...
@@ -653,7 +680,7 @@ Coordinate systems and transformations can be stored in two distinct locations:
     {
       "type": "translation",
       "translation": [0, 0, 100],
-      "input": {"type": "coordinate_system", "path": {"type": "zarr", "path": "./image_1"}, "ref": "physical"}, // references coordinate system "physical" defined in image_1
+      "input": {"type": "coordinate_system", "path": {"type": "zarr", "format": "relative", "href": "./image_1"}, "ref": "physical"}, // references coordinate system "physical" defined in image_1
       "output": {"type": "coordinate_system", "ref": "world"} // references coordinate system "world" defined in the same document
     }
   ]
@@ -687,7 +714,8 @@ Each `input` and `output` is a typed [`Reference`](#reference-interface) that na
               "type": "coordinate_system",
               "path": {
                 "type": "zarr",
-                "path": "./tile_0.zarr"
+                "format": "relative",
+                "href": "./tile_0.zarr"
               },
               "ref": "physical"
             },  // references coordinate system "physical" defined in tile_0
@@ -700,7 +728,8 @@ Each `input` and `output` is a typed [`Reference`](#reference-interface) that na
               "type": "coordinate_system",
               "path": {
                 "type": "zarr",
-                "path": "./tile_1.zarr"
+                "format": "relative",
+                "href": "./tile_1.zarr"
               },
               "ref": "physical"
             },  // references coordinate system "physical" defined in tile_1
@@ -716,7 +745,8 @@ Each `input` and `output` is a typed [`Reference`](#reference-interface) that na
         "name": "Tile 0",
         "path": {
           "type": "zarr",
-          "path": "./tile_0.zarr"
+          "format": "relative",
+          "href": "./tile_0.zarr"
         }
       },
       {
@@ -725,7 +755,8 @@ Each `input` and `output` is a typed [`Reference`](#reference-interface) that na
         "name": "Tile 1",
         "path": {
           "type": "zarr",
-          "path": "./tile_1.zarr"
+          "format": "relative",
+          "href": "./tile_1.zarr"
         }
       }
     ]
@@ -840,7 +871,8 @@ That is left to be defined on a case-by-case basis for individual key specificat
 ```jsonc
     "path": {
         "type": "myorg:zip",
-        "path": "./mylab.zip"
+        "format": "relative",
+        "href": "./mylab.zip"
     }
 ```
 
@@ -1023,7 +1055,8 @@ Also note some MoBIE specific attributes:
                         "type": "multiscale",
                         "path": {
                           "type": "zarr",
-                          "path": "https://janelia-cosem-datasets.s3.amazonaws.com/jrc_hela-3/jrc_hela-3.zarr/em/fibsem-uint16",
+                          "format": "http",
+                          "href": "https://janelia-cosem-datasets.s3.amazonaws.com/jrc_hela-3/jrc_hela-3.zarr/em/fibsem-uint16",
                         }
                     },
                     {
@@ -1031,7 +1064,8 @@ Also note some MoBIE specific attributes:
                         "type": "multiscale",
                         "path": {
                           "type": "zarr",
-                          "path": "https://janelia-cosem-datasets.s3.amazonaws.com/jrc_hela-3/jrc_hela-3.zarr/labels/mito_seg",
+                          "format": "http",
+                          "href": "https://janelia-cosem-datasets.s3.amazonaws.com/jrc_hela-3/jrc_hela-3.zarr/labels/mito_seg",
                         },
                     }
                 ]
@@ -1045,7 +1079,8 @@ Also note some MoBIE specific attributes:
                         "type": "multiscale",
                         "path": {
                           "type": "zarr",
-                          "path": "https://janelia-cosem-datasets.s3.amazonaws.com/jrc_macrophage-2/jrc_macrophage-2.zarr/em/fibsem-uint16"
+                          "format": "http",
+                          "href": "https://janelia-cosem-datasets.s3.amazonaws.com/jrc_macrophage-2/jrc_macrophage-2.zarr/em/fibsem-uint16"
                         }
                     },
                     {
@@ -1053,7 +1088,8 @@ Also note some MoBIE specific attributes:
                         "type": "multiscale",
                         "path": {
                           "type": "zarr",
-                          "path": "https://janelia-cosem-datasets.s3.amazonaws.com/jrc_macrophage-2/jrc_macrophage-2.zarr/labels/mito_seg"
+                          "format": "http",
+                          "href": "https://janelia-cosem-datasets.s3.amazonaws.com/jrc_macrophage-2/jrc_macrophage-2.zarr/labels/mito_seg"
                         },
                     }
                 ]
@@ -1067,7 +1103,8 @@ Also note some MoBIE specific attributes:
                         "type": "multiscale",
                         "path": {
                           "type": "zarr",
-                          "path": "https://janelia-cosem-datasets.s3.amazonaws.com/jrc_jurkat-1/jrc_jurkat-1.zarr/em/fibsem-uint16"
+                          "format": "http",
+                          "href": "https://janelia-cosem-datasets.s3.amazonaws.com/jrc_jurkat-1/jrc_jurkat-1.zarr/em/fibsem-uint16"
                         }
                     },
                     {
@@ -1075,7 +1112,8 @@ Also note some MoBIE specific attributes:
                         "type": "multiscale",
                         "path": {
                           "type": "zarr",
-                          "path": "https://janelia-cosem-datasets.s3.amazonaws.com/jrc_jurkat-1/jrc_jurkat-1.zarr/labels/mito_seg"
+                          "format": "http",
+                          "href": "https://janelia-cosem-datasets.s3.amazonaws.com/jrc_jurkat-1/jrc_jurkat-1.zarr/labels/mito_seg"
                         },
                     }
                 ]
@@ -1107,7 +1145,8 @@ https://github.com/normanrz/ngff-rfc8-collection-examples/.
             "type": "singlescale",
             "path": {
               "type": "zarr",
-              "path": "./s0"
+              "format": "relative",
+              "href": "./s0"
             },
             "attributes": {
               "coordinateTransformations": [
@@ -1151,7 +1190,8 @@ The multiscale group contains the following metadata:
             "type": "singlescale",
             "path": {
               "type": "zarr",
-              "path": "./s0"
+              "format": "relative",
+              "href": "./s0"
             },
           }
         ],
@@ -1188,7 +1228,8 @@ And the `zarr.json` at the location of the resolution level (`./s0/zarr.json`) c
                 "ref": "physical",
                 "path": {
                   "type": "json",
-                  "path": "../zarr.json"
+                  "format": "relative",
+                  "href": "../zarr.json"
                 }
               }
             }
@@ -1211,7 +1252,8 @@ And the `zarr.json` at the location of the resolution level (`./s0/zarr.json`) c
             "type": "multiscale",
             "path": {
               "type": "zarr",
-              "path": "./raw", // a relative or absolute path
+              "format": "relative",
+              "href": "./raw",
             },
             "attributes": {
                 "example-viewer:settings": {
@@ -1225,7 +1267,8 @@ And the `zarr.json` at the location of the resolution level (`./s0/zarr.json`) c
               "type": "collection",
               "path": {
                 "type": "json",
-                "path": "./nested_collection.json"
+                "format": "relative",
+                "href": "./nested_collection.json"
               }
           }, ...
         ],
@@ -1256,7 +1299,8 @@ And the `zarr.json` at the location of the resolution level (`./s0/zarr.json`) c
                 "type": "singlescale",
                 "path": {
                   "type": "zarr",
-                  "path": "./raw/0"
+                  "format": "relative",
+                  "href": "./raw/0"
                 }
               }
             ],
@@ -1826,7 +1870,7 @@ The collections mechanism is a possibility for extending OME-Zarr in a backwards
 Future additions include:
 
 - Additional node types, such as tables, meshes
-- Additional path types, such as S3 URLs
+- Additional path formats, such as S3 URLs
 
 Within the collections proposal, there are also opportunities for standardizing further metadata:
 
@@ -1929,22 +1973,14 @@ Most RFCs will not need to consider all the following issues. They are included 
 
 ### Security
 
-This proposal allows collection metadata to reference arbitrary paths, including relative paths, absolute file system paths, and remote URLs.
-This introduces several security considerations that implementations MUST address.
+This proposal allows collection metadata to reference other metadata documents through `Path` objects.
+The core of this RFC only defines the `relative` path format, which introduces the security considerations below that implementations MUST address.
 
 **Path traversal.** Relative paths (e.g. `../../sensitive/data`) may be used to reference files outside the intended storage scope.
 Implementations SHOULD validate that resolved paths remain within an expected root directory or storage namespace, and MUST NOT follow paths that escape a defined sandbox without explicit user consent.
 
-**Server-side request forgery (SSRF).** Remote URLs (HTTP/HTTPS) embedded in collection metadata may cause implementations to issue requests to unintended or internal network endpoints.
-Implementations SHOULD restrict which hosts or URL schemes are permitted, and SHOULD NOT automatically fetch remote paths without user awareness.
-
-**Confused deputy / cross-origin data access.** A collection file from one origin may reference data from another origin.
-Implementations SHOULD apply appropriate same-origin or cross-origin access controls and MUST communicate to the user when data is being loaded from a different origin than the collection itself.
-
-**Untrusted collection files.** Collection metadata read from untrusted sources (e.g. files downloaded from the internet, shared links) may contain malicious paths.
-Implementations SHOULD treat collection files from untrusted sources with caution, ideally prompting the user before resolving any external or absolute paths.
-
-**User communication.** Clients SHOULD clearly indicate to the user which remote or external paths are being accessed as a result of loading a collection, so that users can make informed decisions about data access and privacy.
+**Resource exhaustion.** Cyclic or very deeply nested paths may cause implementations to issue an unbounded number of requests.
+Implementations MUST detect cycles as described in [Path resolution](#path-resolution) and MAY limit the depth to which they resolve nested paths.
 
 <!--
 What impact will this proposal have on security? Does the proposal require a
