@@ -262,6 +262,8 @@ This RFC defines the rules for `href` values with the `relative` format only.
 Examples:
 - `./image.ome.zarr`
 - `../image.ome.zarr`
+- `./registered/em.ome.zarr`
+- `s0`
 
 See the [Security](#security) section for guidance on access restrictions.
 
