@@ -698,9 +698,9 @@ Note: We acknowledge that, since most if not all OME-Zarr implementations are in
 
 An extension MUST have a unique identifier, which SHOULD be an absolute URI that SHOULD end with either `#` or `/`.
 
-All custom types defined by an extension MUST have their own unique identifier, which MUST be built by appending a type-specific suffix (the type’s name, within the context of the extension that defines it) to the extension’s identifier.
+All custom types defined by an extension MUST have their own unique identifier, which MUST be built by appending a type-specific suffix (the type’s _local name_, within the context of the extension that defines it) to the extension’s identifier.
 
-> For example, if an extension with the identifier `https://example.org/my-ngff-extension/` defined a new type of coordinate transformation named `NonLinearTransform`, the identifier for the new type would be `https://example.org/my-ngff-extension/NonLinearTransform`.
+> For example, if an extension with the identifier `https://example.org/my-ngff-extension/` defined a new type of coordinate transformation named `NonLinearTransform`, the identifier for the new type would be `https://example.org/my-ngff-extension/NonLinearTransform`, with `NonLinearTransform` being the type’s local name.
 
 ### Extension points
 
@@ -715,6 +715,13 @@ For example, the [`Path` interface](#path-interface) proposed by this very RFC h
 ### Extension manifest
 
 Any `zarr.json` file that makes use of extension-defined custom types MUST declare an extension manifest, which MUST list every extension used within the file. The manifest is stored under the `extensionManifest` key of the `ome` object.
+
+The extension manifest has several purposes, all stemming from the intention of making extensions “manageable”. Notably, it is intended to:
+
+- allow figuring out at a glance (1) whether an OME-Zarr image is making use of extensions at all, and (2) if so, which extensions are being used;
+- provide informations about an extension, including pointers to human-readable documentation and machine-readable schemas.
+
+When the metadata of an OME-Zarr image are spread over several `zarr.json` files in different Zarr groups, each `zarr.json` file MUST carry its own manifest, listing the extensions used in that file. Additionally, the manifest in the root-level `zarr.json` file SHOULD list every extension used in any of the downstream `zarr.json` files, so that a reader can find out which extensions are being used in an entire image without having to check all the `zarr.json` files in the Zarr hierarchy.
 
 The manifest MUST be an array of extension objects. Each listed extension MUST be an object with the following fields:
 
@@ -735,35 +742,272 @@ Each item in the `schemas` list MUST be an object with the following fields:
 | `"type"` | string | yes | Value MUST be either `linkml` or `jsonschema`. |
 | `"url"` | string | yes | A URL pointing to the schema. |
 
+Future versions of this specification may add new types of schemas.
+
+#### Use of schemas
+
+An extension MUST provide at least one schema in one of the supported schema definition languages (currently `linkml` or `jsonschema`).
+
+When using a JSON-Schema, every custom object type defined by the extension MUST be formally described in an entry within the `$defs` key of the JSON-Schema, where the name of the entry MUST match the custom type’s local name.
+
+When using a LinkML schema, every custom object type defined by the extension MUST be formally described by a LinkML class definition whose name MUST match the custom type’s local name.
+
+Readers that do not explicitly support an extension MAY use the provided schema(s) to attempt to validate the extension’s data. If they do so, they SHOULD treat any validation error the same way as they would treat any non-compliant data.
+
+Viewers that do not explicitly support an extension MAY use the provided schema(s) to display the extension’s data in a meaningful way, for example by using any provided human-readable labels and descriptions for the objects and fields that make up the extension’s data.
+
+#### The `mustUnderstand` flag
+
+Some extensions are intended to only add non-essential information, such as a viewer’s display settings, or a description of how the image was acquired. A reader that ignores such extensions can still interpret the rest of the data correctly. Other extensions may change what the data _means_, e.g. a coordinate transformation the reader cannot apply, or pixel values that are not intensities. A reader that ignores those would be at risk at misleading its users. The `mustUnderstand` flag lets writers state which case applies for any given extension.
+
+When a reader encounters a custom type that (1) it does not explicitly support and (2) is defined by an extension whose `mustUnderstand` flag is set to `true`, the reader MUST NOT silently fall back to a generic interpretation of the object; it MAY skip the object and report it as unsupported; it MAY continue to interpret the rest of the dataset. When the custom type is a [trait](#traits), this paragraph applies to the object that is carrying the trait.
+
+Readers MAY use the extension manifest to decide up front whether an OME-Zarr image is likely to be fully supported, without waiting to encounter an unknown custom type.
+
+Writers SHOULD set `mustUnderstand: true` for a given extension only when ignoring the extension’s data would cause _incorrect_ interpretation, not merely _less complete_ interpretation.
+
 ### Examples
 
-#### A `Path` with an extension `type` value
+#### Extending the `Path` object
+
+This example illustrates an extension with ID `https://ngff.example.org/omero/` that adds a a custom type of `Path` that points to an image on an OMERO server rather than to a file.
 
 ```jsonc
-    "path": {
-        "type": "myorg:zip",
-        "path": "./mylab.zip"
+{
+    "ome": {
+        "version": "0.x",
+        "extensionManifest": [
+            {
+                "id": "https://ngff.example.org/omero/",
+                "version": "0.3",
+                "name": "OMERO connector extension for OME-Zarr",
+                "description": "An extension to allow referring to remote OMERO images from within a OME-Zarr image.",
+                "homepage": "https://ngff.example.org/omero/",
+                "schemas": [
+                    {
+                        "type": "jsonschema",
+                        "url": "https://schemas.ngff.example.org/omero/0.3/omero.json"
+                    }
+                ]
+            }
+        ],
+        "type": "collection",
+        "nodes": [
+            {
+                "name": "original-acquisition",
+                "type": "multiscale",
+                "path": {
+                    "type": "https://ngff.example.org/omero/OMEROPath",
+                    "path": "https://omero.example.org/webclient/?show=image-48213",
+                    "host": "omero.example.org",
+                    "port": 4064,
+                    "imageId": 48213
+                }
+            },
+            {
+                "name": "segmentation",
+                "type": "multiscale",
+                "path": {"type": "zarr", "path": "./segmentation"}
+            }
+        ]
     }
+}
 ```
 
-#### A `coordinateTransformation` with an extension `type` value
+The JSON-Schema for that extension could be:
 
 ```jsonc
-"coordinateTransformations": [
-  {
-    "type": "translation",
-    "translation": [0, 0, 100],
-    ...
-  },
-  {
-    "type": "myorg:nonlinear",
-    ...
-  }
-]
+{
+    "$defs": {
+        "OMEROPath": {
+            "description": "A Path that points to an image on an OMERO server.",
+            "properties": {
+                "type": {
+                    "description": "The object's type",
+                    "type": "string"
+                },
+                "path": {
+                    "description": "Full URL to the image.",
+                    "type": "string"
+                },
+                "host": {
+                    "description": "The hostname of the OMERO server.",
+                    "type": "string"
+                },
+                "port": {
+                    "description": "The TCP port to use when connecting to the server.",
+                    "type": "number",
+                    "default": 4064
+                },
+                "imageId": {
+                    "description": "The ID of the image on the OMERO server.",
+                    "type": "number"
+                }
+            },
+            "required": [
+                "type",
+                "path",
+                "host",
+                "imageId"
+            ],
+            "type": "object"
+        }
+    }
+}
 ```
 
+A LinkML schema for the same extension, if one were provided, could be:
 
+```yaml
+id: https://ngff.example.org/omero/
+name: OMERO connector extension for OME-Zarr
+prefixes:
+    linkml: https://w3id.org/linkml/
+imports:
+    - linkml:types
+default_range: string
+classes:
+    OMEROPath:
+        description: A Path that points to an image on an OMERO server.
+        attributes:
+            type:
+                description: The object’s type.
+                required: true
+            path: 
+                description: Full URL to the image.
+                range: uri
+                required: true
+            host:
+                description: The hostname of the OMERO server.
+                required: true
+            port:
+                description: The TCP port to use when connecting to the server.
+                range: integer
+                ifabsent: int(4064)
+            imageId:
+                description: The ID of the image on the OMERO server.
+                range: integer
+                required: true
+```
 
+#### A custom `coordinateTransformation`
+
+In this example, a `https://ngff.example.com/transforms/` extension defines a custom type of coordinate transformation that uses the “thin plate spline” technique.
+
+```jsonc
+{
+    "ome": {
+        "version": "0.x",
+        "extensionManifest": [
+            {
+                "id": "https://ngff.example.com/transforms/",
+                "version": "0.1",
+                "name": "OME-Zarr additional transforms",
+                "description": "An extension providing additional coordinate transformations.",
+                "homepage": "https://example.com/ngff-extensions/transforms/",
+                "schemas": [
+                    {
+                        "type": "jsonschema",
+                        "url": "https://schemas.example.org/transforms/0.1/transforms.json"
+                    }
+                ]
+            }
+        ],
+        "type": "collection",
+        "traits": {
+            "scene": {
+                "coordinateSystems": [
+                    {
+                        "id": "physical",
+                        "axes": {
+                            {"name": "y", "type": "space", units="micrometer"},
+                            {"name": "x", "type": "space", units="micrometer"}
+                        }
+                    },
+                    {
+                        "id": "registered",
+                        "axes": {
+                            {"name": "y", "type": "space", units="micrometer"},
+                            {"name": "x", "type": "space", units="micrometer"}
+                        }
+                    }
+                ],
+                "coordinateTransformations": [
+                    {
+                        "type": "https://ngff.example.com/transforms/ThinPlateSpline",
+                        "input": {"id": "physical"},
+                        "output": {"id": "registered"},
+                        "controlPoints": {"type": "zarr", "path": "./tps/control_points"},
+                        "regularization": 0.01
+                ]
+            },
+        "nodes": [ /* ... */ ]
+    }
+}
+```
+
+#### Viewer rendering states
+
+In this example, two OME-Zarr viewers, “Viewer A” and “Viewer B” each have their own extension providing a custom trait to store their own display settings for the same image.
+
+```jsonc
+{
+    "ome": {
+        "version": "0.x",
+        "extensionManifest": [
+            {
+                "id": "https://viewer-a.example.com/settings/",
+                "version": "0.1",
+                "name": "Viewer-A visualisation settings",
+                "description": "An extension to store Viewer A-specific settings into an OME-Zarr image",
+                "homepage": "https://viewer-a.example.com/",
+                "schemas": [
+                    {
+                        "type": "jsonschema",
+                        "url": "https://viewer-a.example.com/ngff/schemas/settings-0.1.json"
+                    }
+                ]
+            },
+            {
+                "id": "https://viewer-b.example.org/rendering/",
+                "version": "0.2",
+                "name": "Viewer-B visualisation settings",
+                "description": "An extension to store Viewer B-specific settings into an OME-Zarr image",
+                "homepage": "https://viewer-b.example.org/",
+                "schemas": [
+                    {
+                        "type": "jsonschema",
+                        "url": "https://viewer-b.example.org/ngff-embedded-settings.json"
+                    }
+                ]
+            }
+        ],
+        "type": "collection",
+        "nodes": [
+            {
+                "name": "nuclei",
+                "type": "multiscale",
+                "path": {"type": "zarr", "path": "./nuclei"},
+                "traits": [
+                    {
+                        "type": "https://viewer-a.example.com/settings/Layer",
+                        "visible": true,
+                        "opacity": 1.0,
+                        "shader": "void main() { emitRGB(vec3(0.0, 0.0, toNormalized(getDataValue()))); }"                      
+                    },
+                    {
+                        "type": "https://viewer-b.example.org/rendering/Display",
+                        "colormap": "blue",
+                        "contrastLimits": [110, 3800],
+                        "gamma": 1.0,
+                        "blending": "additive"
+                    }
+                ]
+            }
+        ]
+    }
+}
+```
 
 ## User stories
 
