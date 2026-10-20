@@ -1636,6 +1636,18 @@ The learning curve would be higher than with a purpose-built format, without cor
 
 For these reasons, the RFC adopts a simpler custom format with a prefix-based naming scheme instead of JSON-LD.
 
+### Custom types identified by prefixed keywords
+
+An initial version of this RFC proposed that third parties could extend the specification by (1) registering an extension prefix into a registry maintained by the community and (2) prepend the registered prefix to any type name they wish to create.
+
+This was abandoned in favour of (1) mandating that custom types be identified by an identifier that is derived from an _extension_ identifier, where the extension is itself declared in the _extension manifest_; and (2) recommending that extension identifiers (and therefore custom type identifiers) be URI-based. This better meets the [desired characteristics](https://github.com/gouttegd/yamf-playground/blob/main/ome-zarr/EXTENSIBILITY_MANIFESTO.md#desired-characteristics-for-a-manageable-extensibility-mechanism) for OME-Zarr extensibility, as set forth in the June 2026 Heidelberg hackathon.
+
+### Prefixed attribute keys
+
+An initial version of this RFC proposed that third parties could append custom metadata to any node by adding prefixed keys to an `attributes` dictionary carried by every node, where the prefix has been previously registered into a registry maintained by the community (as for custom types, see previous section).
+
+This was abandoned in favour of the [trait](#traits) concept.
+
 
 <!--
 As RFCs evolve, it is common that there are ideas that are abandoned. Rather
@@ -1964,6 +1976,17 @@ Shortened version from https://gist.githubusercontent.com/will-moore/fe0e260544b
 }
 </pre>
 </details>
+
+### Rust traits
+
+[Traits](#traits), as used in this RFC, were inspired by the [concept of the same name](https://doc.rust-lang.org/book/ch10-02-traits.html) in the Rust programming language.
+
+### Extensions
+
+The design of the [extensibility mechanism](#extensions) was influenced by:
+
+- the [OME-Zarr Extensibility Manifesto](https://github.com/gouttegd/yamf-playground/blob/main/ome-zarr/EXTENSIBILITY_MANIFESTO.md), which is itself the result of a discussion that took place in a OME-Zarr hackathon held in Heidelberg in June 2026;
+- the [Proposal for a generic extensibility scheme](https://github.com/gouttegd/yamf-playground/blob/main/EXTENSIBILITY.md) – what this RFC calls a “trait” is essentially what that proposal called a “class extension”.
 
 <!--
 
