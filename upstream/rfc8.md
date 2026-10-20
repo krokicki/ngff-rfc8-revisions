@@ -152,7 +152,8 @@ illustrating individual aspects of the proposal, e.g.:
             "type": "singlescale",
             "path": {
               "type": "zarr",
-              "path": "./s0"
+              "format": "relative",
+              "href": "./s0"
             },
           }
         ]
@@ -163,10 +164,29 @@ illustrating individual aspects of the proposal, e.g.:
 More complete examples showing how these components can be combined to support
 the use cases described in the Background are provided later in the document.
 
+### Features deferred to subsequent sub-RFC
+
+This RFC will defer the definition of some features to forthcoming sub-RFCs. 
+In doing so, we aim to help reviewers focus on providing feedback on the core building being defined in this RFC. 
+In parallel to the review of RFC-8, we will author sub-RFCs for each deferred feature that propose how they will be expressed using the core RFC-8 building blocks. 
+As we iterate on the design of RFC-8, we will update the sub-RFCs. 
+All deferred features will be proposed and evaluated via the RFC process before the v1.0 specification is released.
+
+The following features are being deferred to sub-RFCs:
+
+| Topic | Scope |
+|---|---|
+| **HCS** | Plate and well traits |
+| **Labels** | Label image traits and per-label properties |
+| **bioformats2raw and OME-XML** | Series layout and the OME/METADATA.ome.xml mapping |
+| **Absolute and remote references** | Absolute paths and URLs, authentication and security |
+| **snake_case** | Making keys and identifiers consistent with Zarr |
+| **Legacy multiscales** | A `legacy_multiscale` node type for unchanged 0.5 and 0.6 images |
+| **Singlescale images** | A node type for images with a single resolution level. |
 
 ### Building blocks
 
-The building blocks define how objects are represented using paths and references.
+The building blocks define how objects are represented using paths, declarations and references.
 
 (rfcs:rfc8:path-interface)=
 #### `Path` interface
@@ -183,7 +203,8 @@ used to build up the definition of an image.
 ```jsonc
     "path": {
         "type": "zarr",
-        "path": "./s0"
+        "format": "relative",
+        "href": "./s0"
     }
 ```
 
@@ -193,7 +214,8 @@ used to build up the definition of an image.
 | Field | Type | Required? | Notes |
 | - | - | - | - |
 | `"type"` | string | yes | Value MUST be a valid path type. |
-| `"path"` | string | yes | Value MUST be a string containing a path. See below. |
+| `"format"` | string | yes | Value MUST be a valid path format. See below. |
+| `"href"` | string | yes | Value MUST be a string containing a path in the declared `format`. See below. |
 
 (rfcs:rfc8:path-interface-field-type)=
 ##### Field: `type`
@@ -207,40 +229,95 @@ The `type` field of a `Path` object defines how the path is interpreted. This RF
 
 The `type` field of a `Path` object is an extension point. For detail on how to extend the `type` field with new values, see [Extensions](#extensions).
 
-(rfcs:rfc8:path-interface-field-path)=
-##### Field: `path`
+(rfcs:rfc8:path-interface-field-format)=
+##### Field: `format`
 
-The `path` string can be one of the following types:
+The `format` field of a `Path` object declares how the `href` string is to be interpreted.
+Implementations MUST use the `format` field to interpret the `href` and MUST NOT infer the format from the `href` string itself (e.g. from a `file://` or `https://` prefix).
 
-- **Relative paths.**
-  To reference nodes that are on the same file system namespace as the json file describing the collection, relative paths may be used.
-  Relative paths are interpreted relative to the json file describing the collection.
-  Relative paths follow the relative path notation defined in [IETF RFC1808](https://datatracker.ietf.org/doc/html/rfc1808).
+The following path formats are defined:
+
+| Format | Defined in | Description |
+| - | - | - |
+| `"relative"` | this RFC | A path relative to the metadata document that contains the `Path` object. |
+
+Only `relative` is a core path format of this RFC.
+Implementations that do not support the declared `format` MUST NOT attempt to resolve the path and SHOULD treat the referenced node as unavailable.
+
+Future RFCs may propose additional path formats, such as S3 URLs or chained paths (e.g. for referencing files within a zip file).
+
+(rfcs:rfc8:path-interface-field-href)=
+##### Field: `href`
+
+The `href` string locates the referenced document in the declared `format`.
+This RFC defines the rules for `href` values with the `relative` format only.
+
+- Relative paths are resolved from the location of the metadata document that contains the `Path` object,
+  i.e. from the Zarr group whose `zarr.json` contains it, or from the directory of the standalone JSON file that contains it.
+- Relative paths follow the relative path notation defined in [IETF RFC1808](https://datatracker.ietf.org/doc/html/rfc1808).
   Briefly, `.` and `..` are used to navigate the hierarchy and the hierarchy is separated by `/`.
-  Relative paths may be used for data stored on traditional file systems as well as other storage protocols, such as HTTP or S3.
-  Examples:
-  - `./image.ome.zarr`
-  - `../image.ome.zarr`
-- **Absolute file paths.**
-  On traditional file systems, absolute paths may be used with the `file` scheme as specified by [IETF RFC8089](https://datatracker.ietf.org/doc/html/rfc8089).
-  Please note that absolute file paths are generally not portable across operating systems or file systems.
-  Examples:
-  - `file:///home/user/data/image.ome.zarr`
-  - `file://C:/Users/user/data/image.ome.zarr`
-- **HTTP(S) URLs.**
-  To reference nodes that are stored remotely, URLs with the `http` or `https` scheme may be used.
-  URLs follow the notation defined in [IETF RFC1738](https://datatracker.ietf.org/doc/html/rfc1738).
-  Examples:
-  - `https://example.com/image.ome.zarr`
-  - `http://example.com/image.ome.zarr`
+- Relative paths may be used for data stored on traditional file systems as well as other storage protocols, such as HTTP or S3.
+  The storage protocol is determined by how the containing document was accessed, not by the `href`.
 
-Future RFCs may propose additional path types, such as S3 URLs or chained paths (e.g. for referencing files within a zip file).
+Examples:
+- `./image.ome.zarr`
+- `../image.ome.zarr`
+- `./registered/em.ome.zarr`
+- `s0`
+
 See the [Security](#security) section for guidance on access restrictions.
+
+(rfcs:rfc8:path-interface-resolution)=
+##### Path resolution
+
+Resolving a node's `path` means loading the document it locates, and, if the root node of that document has child nodes with a `path`, resolving those in turn.
+Resolving node paths MUST NOT form a cycle: a node's `path` MUST NOT resolve to a document that contains that node, directly or through a chain of other node paths.
+Implementations MUST detect cycles and MUST stop resolving and report an error when they encounter one.
+
+This rule applies to the `path` fields of nodes.
+The `path` field of a [`Reference`](#reference-interface) only locates the document that contains the referenced object and MAY point back to an enclosing document, e.g. from a resolution level to the coordinate systems of its multiscale.
+
+(rfcs:rfc8:declaration-interface)=
+#### `Declaration` interface
+
+Every object that can be referenced is declared exactly once.
+A declaration is the place where an object's `id` and its other fields are defined, e.g. an entry in a `nodes` or `coordinateSystems` array.
+
+Every declaration MUST have the following fields:
+
+| Field | Type | Required? | Notes |
+| - | - | - | - |
+| `"type"` | string | yes | Value MUST be the kind of the declared object, e.g. `"collection"`, `"multiscale"` or `"singlescale"` for nodes and `"coordinate_system"` for coordinate systems. |
+| `"id"` | string | yes | Value MUST be the identifier of the declared object. IDs MUST be unique within the JSON document. |
+
+Additional fields, traits and child nodes of an object are defined on its declaration.
+Everywhere else, the object is referred to with a [`Reference`](#reference-interface).
+Declarations use the `id` key and references use the `ref` key, so that a declaration can always be told apart from a reference.
 
 (rfcs:rfc8:reference-interface)=
 #### `Reference` interface
 
 The `Reference` interface is a consistent system for referring to local and remote OME-Zarr metadata objects.
+A reference points to an object that is [declared](#declaration-interface) elsewhere, e.g. in the `input` and `output` fields of coordinate transformations.
+
+(rfcs:rfc8:reference-interface-example)=
+##### Example
+
+A reference to a coordinate system that is declared in the same document:
+
+```jsonc
+"output": { "type": "coordinate_system", "ref": "physical" }
+```
+
+A reference to a coordinate system that is declared in another document:
+
+```jsonc
+"input": {
+  "type": "coordinate_system",
+  "path": { "type": "zarr", "format": "relative", "href": "./raw" },
+  "ref": "physical"
+}
+```
 
 (rfcs:rfc8:reference-interface-schema)=
 ##### Schema
@@ -249,13 +326,20 @@ A reference MUST be an object with the following fields:
 
 | Field | Type | Required? | Notes |
 | - | - | - | - |
-| `"id"` | string | yes | Value MUST be a UUID, MUST be unique within the JSON document, and SHOULD be a UUIDv7+. |
-| `"path"` | object | no | Value MUST be a `Path` object. |
+| `"type"` | string | yes | Value MUST be the `type` of the referenced declaration. |
+| `"ref"` | string | yes | Value MUST be the `id` of the referenced declaration. |
+| `"path"` | object | no | Value MUST be a `Path` object locating the document that contains the referenced declaration. |
 
-(rfcs:rfc8:reference-interface-field-path)=
-##### Field: `path`
+A reference MUST NOT contain any other fields.
+In particular, a reference MUST NOT carry traits or child nodes; these belong to the declaration.
 
-For external references, the `path` field MUST be present.
+(rfcs:rfc8:reference-interface-resolution)=
+##### Resolution
+
+- If `path` is absent, `ref` is resolved within the current metadata document.
+- If `path` is present, `ref` is resolved within the metadata document that `path` locates.
+- The resolved declaration MUST have the `type` that the reference names.
+  Implementations MUST report an error if no declaration with the given `ref` exists in the resolved document, or if its `type` does not match.
 
 (rfcs:rfc8:abstract-structure)=
 ### Abstract structure
@@ -271,12 +355,14 @@ added to collections or nodes, which is an opportunity to add metadata that is
 only valid for a node in the context of a collection (e.g. rendering settings).
 
 (rfcs:rfc8:abstract-structure-node)=
-#### `Node`
+#### `Node` interface
 
 This RFC defines a basic interface for an OME-Zarr metadata object, which we
 name `Node`. The [Node interface](#node) is a consistent JSON structure for
 several different types of OME-Zarr metadata object and the root only stores
 information used for identifying and referencing the object.
+
+Nodes conform to the [`Declaration` interface](#declaration-interface) and therefore require the `type` and `id` fields.
 
 (rfcs:rfc8:abstract-structure-node-schema)=
 ##### Schema
@@ -314,8 +400,6 @@ A primary use case for the `traits` field is the specialization of collections a
 Traits that are defined as part of this RFC or sub-RFCs are:
 - `coordinateSystems`
 - `coordinateTransformations`
-- `labels`, as well as `labelValue` and `color` in label attributes
-- `plate`, `well`, `acquisition` for HCS metadata
 
 Trait keys within the `traits` dictionary of nodes are an extension point. Custom extensions can add prefixed keys (e.g., `neuroglancer:shader`, `webknossos:settings`). See [Extensions](#extensions) for more details.
 
@@ -366,14 +450,77 @@ Standalone files are useful for persisting groupings of images that may or may n
 }
 ```
 
+(rfcs:rfc8:metadata-storage-consolidated)=
+##### Consolidated metadata (non-normative)
+
+This section is non-normative.
+
+Resolving a tree of path-referenced nodes requires fetching the `zarr.json` of each referenced Zarr group (see [Performance](#performance)).
+To reduce the number of requests, writers MAY use [Zarr consolidated metadata](https://github.com/zarr-developers/zarr-specs/pull/309) to bundle the `zarr.json` documents of referenced nodes into the `zarr.json` of the root group.
+Consolidated metadata stores a copy of the `zarr.json` of every group and array below the root group as a flat mapping, keyed by the path relative to the root group.
+A reader that supports consolidated metadata can then load the whole tree in a single request.
+This also applies to nested collections: their `zarr.json` documents may be consolidated into the root, while they remain separate documents with their own `ome` metadata.
+
+```jsonc
+{
+  // zarr.json of the root group
+    "zarr_format": 3,
+    "node_type": "group",
+    "attributes": {
+        "ome": {
+            "version": "0.x",
+            "type": "collection",
+            "id": "01a1354d-7cd7-724f-96d6-29c9d60bbf28",
+            "name": "consolidated-example",
+            "nodes": [
+                {
+                    "type": "multiscale",
+                    "id": "01a1354d-7cd7-7a1e-8f3c-2b6d4e5f7a81",
+                    "name": "image",
+                    "path": { "type": "zarr", "format": "relative", "href": "./image" }
+                }
+            ]
+        }
+    },
+    "consolidated_metadata": {
+        "kind": "inline",
+        "must_understand": false,
+        "metadata": {
+            "image": {
+                // copy of ./image/zarr.json
+                "zarr_format": 3,
+                "node_type": "group",
+                "attributes": { "ome": { ... } }
+            },
+            "image/s0": {
+                // copy of ./image/s0/zarr.json
+                "zarr_format": 3,
+                "node_type": "array",
+                ...
+            }
+        }
+    }
+}
+```
+
+The individual `zarr.json` files remain the source of truth.
+The consolidated copy is only a cache, and it can go stale when a referenced node is modified without updating the root.
+Readers that support consolidated metadata use the consolidated copy when it is present, so they see outdated metadata until the root is consolidated again.
+Keeping the cache consistent with the individual files would require an external transaction system, such as [Icechunk](https://icechunk.io) or a custom database.
+
+Consolidated metadata is a pure Zarr mechanism, and this RFC adds no OME-specific rules to it.
+Readers that do not support consolidated metadata fetch the `zarr.json` of each referenced node as usual.
+Consolidated metadata can only cover Zarr nodes within the hierarchy of the root group; standalone JSON files and nodes outside the root group are always fetched individually.
+
+At the time of writing, the Zarr-level specification of consolidated metadata is incomplete, which limits what this RFC can say about it.
+A future revision may give more guidance once the Zarr specification is finalized.
 
 ### New and modified core classes
 
 Building on the core building blocks and the abstract structure, the following
 sections define concrete node types for collections, single-scale images, and
 multiscale images, and integrate coordinate systems and transformations from
-RFC-5. Existing OME-Zarr structures such as multiscales and
-bioformats2raw.layout are reworked within the Node/Collection-based framework.
+RFC-5. Existing OME-Zarr structures such as multiscales are reworked within the Node/Collection-based framework.
 
 (rfcs:rfc8:collection-node)=
 #### `Collection` node
@@ -384,8 +531,7 @@ images, including segmentations, prediction maps and other derived images as
 well as other data types ("nodes"). Collections can be nested. Collections can
 have metadata attached. Within collections, nodes can also have metadata, which
 complements or overrides the nodes' own metadata. Nodes within collections are
-referenced by paths instead of relying on a file system hierarchy. Paths may
-also be absolute and point to remote storage.
+referenced by paths instead of relying on a file system hierarchy.
 
 (rfcs:rfc8:collection-node-schema)=
 ##### Schema
@@ -401,6 +547,8 @@ also be absolute and point to remote storage.
 
 Either `"nodes"` or `"path"` MUST be present, but not both.
 
+If `"path"` is present, the document it resolves to MUST have a root node of type `collection`.
+
 ```jsonc
 {
   "ome": {
@@ -413,7 +561,8 @@ Either `"nodes"` or `"path"` MUST be present, but not both.
           "name": "gallery1",
           "path": {
             "type": "json",
-            "path": "../gallery.json"
+            "format": "relative",
+            "href": "../gallery.json"
           }
       }, ...]
   }
@@ -457,7 +606,8 @@ This new interface replaces the dataset metadata defined in the previous version
     "name": "s0",
     "path": {
       "type": "zarr",
-      "path": "./s0"
+      "format": "relative",
+      "href": "./s0"
     },
     "attributes": {
       ...
@@ -486,6 +636,8 @@ This new interface replaces the multiscale metadata defined in the previous vers
 
 Either `"nodes"` or `"path"` MUST be present, but not both.
 
+If `"path"` is present, the document it resolves to MUST have a root node of type `multiscale`.
+
 ```jsonc
 {
     "ome": {
@@ -500,7 +652,8 @@ Either `"nodes"` or `"path"` MUST be present, but not both.
             "type": "singlescale",
             "path": {
               "type": "zarr",
-              "path": "./s0"
+              "format": "relative",
+              "href": "./s0"
             },
             "traits": {
               ...
@@ -528,12 +681,15 @@ Coordinate systems and transformations can be stored in two distinct locations:
       "type": "translation",
       "translation": [0, 0, 100],
       "input": {
-        "id": "01a13dae-bfca-77db-9ee9-7d0de8967ff3",
+        // references coordinate system 'physical' defined in image_1
+        "type": "coordinate_system",
+        "ref": "01a13dae-bfca-77db-9ee9-7d0de8967ff3",
         "name": "physical",
-        "path": "./image_1"  // references collection node
+        "path": {"type": "zarr", "format": "relative", "href": "./image_1"},
       },
       "output": {
-        "id": "01a13e01-a07b-711a-9443-6b8fe29e8422", // references coordinate system ID
+        // references coordinate system 'world' defined in the same document
+        "ref": "01a13e01-a07b-711a-9443-6b8fe29e8422",
         "name": "world"
       }
     }
@@ -541,7 +697,8 @@ Coordinate systems and transformations can be stored in two distinct locations:
 }
 ```
 
-In a change from the previous specification, coordinate systems are referenced using the [Reference mechanism](#reference-interface), i.e. via IDs, and not via names.
+In a change from RFC-5, coordinate systems are referenced by ID and not by name.
+Each `input` and `output` is a typed [`Reference`](#reference-interface) that names the kind of the target (e.g. `coordinate_system`) and its `id` in the `ref` field.
 
 ```jsonc
 {
@@ -554,7 +711,9 @@ In a change from the previous specification, coordinate systems are referenced u
       "scene": {
         "coordinateSystems": [
           {
-            "id": "01a13e01-a07b-711a-9443-6b8fe29e8422",  // world
+            "type": "coordinate_system",
+            "id": "01a13e01-a07b-711a-9443-6b8fe29e8422",
+            "name": "world",
             "axes": [...]
           }
         ],
@@ -563,25 +722,35 @@ In a change from the previous specification, coordinate systems are referenced u
             "type": "translation",
             "translation": [0, 0, 100],
             "input": {
+              "type": "coordinate_system",
+              "ref": "01a13dae-bfca-77db-9ee9-7d0de8967ff3",  //physical
               "path": {
                 "type": "zarr",
-                "path": "./tile_0.zarr"
+                "format": "relative",
+                "href": "./tile_0.zarr"
               },
-              "id": "01a13dae-bfca-77db-9ee9-7d0de8967ff3"  // physical
             },  // references coordinate system "physical" defined in tile_0
-            "output": {"id": "01a13e01-a07b-711a-9443-6b8fe29e8422"}  // references coordinate system "world" defined in same node
+            "output": {
+              "type": "coordinate_system",
+              "ref": "01a13e01-a07b-711a-9443-6b8fe29e8422"
+            }  // references coordinate system "world" defined in same node
           },
           {
             "type": "translation",
             "translation": [100, 0, 0],
             "input": {
+              "type": "coordinate_system",
+              "ref": "01a13e05-943e-77e2-b23d-190a5c03f019",  // physical
               "path": {
                 "type": "zarr",
-                "path": "./tile_1.zarr"
-              },
-              "id": "01a13e05-943e-77e2-b23d-190a5c03f019"  // physical
+                "format": "relative",
+                "href": "./tile_1.zarr"
+              }
             },  // references coordinate system "physical" defined in tile_1
-            "output": {"id": "01a13e01-a07b-711a-9443-6b8fe29e8422"}  // references coordinate system "world" defined in same node
+            "output": {
+              "type": "coordinate_system",
+              "ref": "01a13e01-a07b-711a-9443-6b8fe29e8422"
+            }  // references coordinate system "world" defined in same node
           }
         ]
       }
@@ -593,7 +762,8 @@ In a change from the previous specification, coordinate systems are referenced u
         "name": "Tile 0",
         "path": {
           "type": "zarr",
-          "path": "./tile_0.zarr"
+          "format": "relative",
+          "href": "./tile_0.zarr"
         }
       },
       {
@@ -602,7 +772,8 @@ In a change from the previous specification, coordinate systems are referenced u
         "name": "Tile 1",
         "path": {
           "type": "zarr",
-          "path": "./tile_1.zarr"
+          "format": "relative",
+          "href": "./tile_1.zarr"
         }
       }
     ]
@@ -620,6 +791,7 @@ The `Coordinate System` objects have the following fields:
 
 | Field | Type | Required? | Notes |
 | - | - | - | - |
+| `"type"` | string | yes | Value MUST be `"coordinate_system"`. |
 | `"id"` | string | yes | Value MUST be a UUID, MUST be unique within the JSON document, and SHOULD be a UUIDv7+. |
 | `"name"` | string | no | More descriptive name for the coordinate system, if needed. |
 | `"axes"` | array of strings | yes | Value MUST be an array of axes, as defined in RFC-5. |
@@ -633,31 +805,29 @@ The `Coordinate Transformation` objects have the following fields:
 | Field | Type | Required? | Notes |
 | - | - | - | - |
 | `"type"` | string | yes | Value MUST be a valid coordinate transform type, as defined in RFC-5. |
-| `"input"` | object | yes | Value MUST be a [`Reference`](#reference-interface) to the input [`Coordinate System`](#coordinate-system-interface). |
-| `"output"` | object | yes | Value MUST be a [`Reference`](#reference-interface) to the output [`Coordinate System`](#coordinate-system-interface). |
+| `"input"` | object | yes | Value MUST be a typed [`Reference`](#reference-interface) to the input of the transformation. |
+| `"output"` | object | yes | Value MUST be a typed [`Reference`](#reference-interface) to the output of the transformation. |
 
 Additional fields MAY be added as required by the transform type.
 
-Depending on the context, different fields are required:
+Depending on the context, the `input` and `output` references point to different kinds of objects:
 
 | Context | `input` | `output` |
 | - | - | - |
-| **scene** | {"id": "01a13e16-c6d6-7057-8a73-7d977c754ea3", "name": "physical" } | { "id": "01a13e16-ff87-701f-a77e-b357eca9fd64", "name": "physical" } |
-| **Multiscale > attributes > coordinateTransformations** | { "id": "01a13e17-4776-72aa-8a9a-f1101d555fc2"} | { "id": "01a13e17-9425-7457-b728-9b545e3bf661", "name": "physical" } |
+| **scene** | `{"type": "coordinate_system", path: {..., "href": "./imageA"}, "ref": "01a13e16-c6d6-7057-8a73-7d977c754ea3"}` | `{"type": "coordinate_system", path: {..., "href": "./imageA"}, "ref": "01a13e16-ff87-701f-a77e-b357eca9fd64"}` |
+| **Multiscale > attributes > coordinateTransformations** | {"type": "singlescale", "ref": "01a13e17-4776-72aa-8a9a-f1101d555fc2"} | { "type": "coordinate_system", "ref": "01a13e17-9425-7457-b728-9b545e3bf661"} |
 
 **Multiscale > attributes > coordinateTransformations**: In the context of multiscales transformations, the following requirements apply:
-- The `input` field MUST reference a [singlescale node](#singlescale-node).
-- The `id` field MUST be present.
-- The `path` field MAY be omitted or null.
-- The `output` fields of all transformations MUST reference the same coordinate system via the `id` field.
+- The `input` field MUST be a reference of type `singlescale` to a [singlescale node](#singlescale-node).
+- The `path` field MAY be omitted.
+- The `output` field MUST be a reference of type `coordinate_system`.
+- The `output` fields of all transformations MUST reference the same coordinate system.
 
 **Node/Multiscales > attributes > scene > coordinateTransformations**:
-In the context of node-level transformations between different multiscale collections,
-the following requirements apply:
-- The `input` field MUST reference a coordinate system via the `id` field.
-- The `output` field MUST reference a coordinate system via the `id` field.
-- If the referenced coordinate system is in the same metadata document, the `path` field MAY be omitted or null.
-  If the referenced coordinate system is in a different metadata document, both the `id` and `path` fields MUST be present.
+In the context of node-level transformations between different multiscale collections, the following requirements apply:
+- The `input` and `output` fields MUST be references of type `coordinate_system`.
+- If the referenced coordinate system is declared in the same metadata document, the `path` field MAY be omitted.
+- If the referenced coordinate system is declared in a different metadata document, the `path` field MUST be present.
 
 
 ##### `Scene` trait
@@ -677,345 +847,6 @@ and the spatial information pertaining to the collection of images (which is sto
 These "new and modified core classes" could become concrete extensions
 under Damien's proposal
 -->
-
-#### Label maps and other derived images
-
-Previous versions of the OME-Zarr specification defined a mechanism for associating label images with a single multiscale image.
-This was achieved by using a `labels` Zarr group that had to be a direct child of the multiscale Zarr group with some specific metadata.
-This proposal replaces this mechanism.
-
-To denote a multiscale image as a label map, the `labels` attribute MUST be present.
-If present, the value of the `labels` attribute MUST be an object with the following fields:
-
-| Field | Type | Required? | Notes |
-| - | - | - | - |
-| `"labelAttributes"` | array of objects | no | Attributes for individual labels. Each object MUST be a [`Label Attributes` object](#label-attributes-interface).
-| `"source"` | array of strings | no | An array with [`Reference`s](#reference-interface) to the source multiscales. |
-
-Because no fields are required, an empty object MAY be used.
-
-In this proposal, the previous `colors` and `properties` fields are combined into a single `labelAttributes` field.
-The `rgba` field in the `colors` objects has been renamed to `color`.
-
-##### `Label Attributes` interface
-
-The `labelAttributes` field is an array of objects with the following fields:
-
-| Field | Type | Required? | Notes |
-| - | - | - | - |
-| `"labelValue"` | number | yes | Value MUST be the label value. |
-| `"color"` | array of number | no | Value MUST be a color in array format. |
-
-If present, the `color` field MUST have an array with four integers between 0 and 255, inclusive. These integers represent the uint8 values of red, green, blue and alpha.
-
-Additional keys MAY be added, [following the attribute key naming rules](#extensions).
-
-The previous `label-value` key is now renamed to `labelValue` for consistency.
-
-
-##### Example
-
-```jsonc
-{
-    "ome": {
-        "version": "0.x",
-        "type": "collection",
-        "name": "label-example",
-        "attributes": { ... },
-        "nodes": [{
-            "id": "01a13e24-04a8-7121-8961-b01fa9d5198f",
-            "name": "raw",
-            "type": "multiscale",
-            "nodes": [ ... ]
-        }, {
-            "name": "nuclei",
-            "type": "multiscale",
-            "nodes": [ ... ],
-            "attributes": {
-                "labels": {
-                    "source": [{"id": "01a13e24-04a8-7121-8961-b01fa9d5198f"}],
-                    "labelAttributes": [{
-                        "labelValue": 1,
-                        "color": [ 255, 0, 0, 255 ]
-                    }, {
-                        "labelValue": 2,
-                        "color": [ 0, 255, 0, 255 ]
-                    }]
-                }
-            }
-        }]
-    }
-}
-```
-
-#### High-content screening (HCS) metadata
-
-High-content screening data is typically organized as a grid of wells on a plate, where each well contains one or more multiscale images from one or more acquisition rounds.
-This section introduces additional metadata for organizing wells on a plate.
-
-This proposal changes the HCS references from numeric IDs and names to UUID-based references, consistent with the [References mechanism](#reference-interface) defined above.
-
-##### `Plate` attribute
-
-A `collection` node representing a plate MUST have a `plate` attribute with the following fields:
-
-| Field | Type | Required? | Notes |
-| - | - | - | - |
-| `"acquisitions"` | array of objects | no | List of acquisitions performed on the plate. Each object MUST be [`Acquisition` objects](#acquisition-interface). |
-| `"columns"` | array of objects | yes | List of columns in the plate. Each object MUST be [`Column` objects](#column-interface). |
-| `"rows"` | array of objects | yes | List of rows in the plate. Each object MUST be [`Row` objects](#row-interface). |
-
-##### `Acquisition` interface
-
-| Field | Type | Required? | Notes |
-| - | - | - | - |
-| `"id"` | string | yes | Value MUST be a UUID, MUST be unique within the JSON document, and SHOULD be a UUIDv7+. |
-| `"name"` | string | no | A human-readable name for the acquisition. |
-
-##### `Column` interface
-
-| Field | Type | Required? | Notes |
-| - | - | - | - |
-| `"id"` | string | yes | Value MUST be a UUID, MUST be unique within the JSON document, and SHOULD be a UUIDv7+. |
-| `"name"` | string | no | A human-readable name for the column. |
-
-##### `Row` interface
-
-| Field | Type | Required? | Notes |
-| - | - | - | - |
-| `"id"` | string | yes | Value MUST be a UUID, MUST be unique within the JSON document, and SHOULD be a UUIDv7+. |
-| `"name"` | string | no | A human-readable name for the row. |
-
-##### `Well` attribute
-
-A `collection` node representing a well MUST have a `well` attribute with the following fields:
-
-| Field | Type | Required? | Notes |
-| - | - | - | - |
-| `"column"` | string | yes | Value MUST be a [`Reference`](#reference-interface) to one of the columns listed in the `plate` attribute on the enclosing plate-level collection. |
-| `"row"` | string | yes | Value MUST be a [`Reference`](#reference-interface) to one of the rows listed in the `plate` attribute on the enclosing plate-level collection. |
-
-##### `Acquisition` attribute
-
-The `acquisition` attribute MUST be a [`Reference`](#reference-interface) to one of the acquisitions.
-It MAY be set on individual `multiscale` nodes within a well or on a `collection` sub-node grouping all images from a single acquisition.
-
-We suggest two possible layouts for HCS data, which are not mutually exclusive and can be used in combination: a "wide" layout where all images are direct children of the well collection and a "tall" layout where images are grouped in sub-collections by acquisition.
-
-##### Wide example (acquisitions flat in the well)
-
-In this layout, all multiscale nodes are direct children of the well collection.
-Each node carries an `acquisition` attribute.
-Derived images such as label maps are siblings of their source image and can still be linked via the `source` reference in their `labels` attribute. This layout is more compact but can become cluttered when there are multiple acquisitions and derived nodes.
-
-```jsonc
-{
-    "ome": {
-        "version": "0.x",
-        "type": "collection",
-        "name": "hcs-plate-001",
-        "attributes": {
-            "plate": {
-                "acquisitions": [
-                    {
-                        "id": "acq_0",
-                        "name": "Acquisition Round 1"
-                    }
-                ],
-                "columns": [
-                    {
-                        "id": "1",
-                        "name": "1"
-                    }
-                ],
-                "rows": [
-                    {
-                        "id": "A",
-                        "name": "A"
-                    }
-                ]
-            }
-        },
-        "nodes": [
-            {
-                "type": "collection",
-                "name": "well A01",
-                "attributes": {
-                    "well": {
-                        "column": {"id": "1"},
-                        "row": {"id": "A"}
-                    }
-                },
-                "nodes": [
-                    {
-                        "id": "A01_0",
-                        "type": "multiscale",
-                        "name": "A01_0",
-                        "path": {
-                            "type": "zarr",
-                            "path": "./A/01/001.img"
-                        },
-                        "attributes": {
-                            "acquisition": {"id": "acq_0"}
-                        }
-                    },
-                    {
-                        "type": "multiscale",
-                        "name": "A01_0_ill_corrected",
-                        "path": {
-                            "type": "zarr",
-                            "path": "./A/01/001_ill_corrected.img"
-                        },
-                        "attributes": {
-                            "acquisition": {"id": "acq_0"},
-                            "source": [{"id": "A01_0"}]
-                        }
-                    },
-                    {
-                        "type": "multiscale",
-                        "name": "A01_0_nuclei",
-                        "path": {
-                            "type": "zarr",
-                            "path": "./A/01/001_nuclei.img"
-                        },
-                        "attributes": {
-                            "acquisition": {"id": "acq_0"},
-                            "labels": {
-                              "source": [{"id": "A01_0"}]
-                            }
-                        }
-                    }
-                ]
-            }
-        ]
-    }
-}
-```
-
-##### Tall example (acquisitions as sub-collections)
-
-In this layout, each acquisition is wrapped in a sub-collection inside the well.
-The `acquisition` attribute is set on the sub-collection rather than on individual nodes.
-This serves as an example that wells can consist of collections, not just multiscales.
-
-```jsonc
-{
-    "ome": {
-        "version": "0.x",
-        "type": "collection",
-        "name": "hcs-plate-001",
-        "attributes": {
-            "plate": {
-                "acquisitions": [
-                    {
-                        "id": "acq_0",
-                        "name": "Acquisition Round 1"
-                    },
-                    {
-                        "id": "acq_1",
-                        "name": "Acquisition Round 2"
-                    }
-                ],
-                "columns": [
-                    {
-                        "id": "1",
-                        "name": "1"
-                    }
-                ],
-                "rows": [
-                    {
-                        "id": "A",
-                        "name": "A"
-                    }
-                ]
-            }
-        },
-        "nodes": [
-            {
-                "type": "collection",
-                "name": "well A01",
-                "attributes": {
-                    "well": {
-                        "column": {"id": "1"},
-                        "row": {"id": "A"}
-                    }
-                },
-                "nodes": [
-                    {
-                        "type": "collection",
-                        "name": "A01_acq0",
-                        "attributes": {
-                            "acquisition": {"id": "acq_0"}
-                        },
-                        "nodes": [
-                            {
-                                "id": "A01_0",
-                                "type": "multiscale",
-                                "name": "A01_0",
-                                "path": {
-                                    "type": "zarr",
-                                    "path": "./A/01/001.img"
-                                }
-                            },
-                            {
-                                "type": "multiscale",
-                                "name": "A01_0_nuclei",
-                                "path": {
-                                    "type": "zarr",
-                                    "path": "./A/01/001_nuclei.img"
-                                },
-                                "attributes": {
-                                    "labels": {
-                                        "source": ["A01_0"]
-                                    }
-                                }
-                            }
-                        ]
-                    },
-                    {
-                        "type": "collection",
-                        "name": "A01_acq1",
-                        "attributes": {
-                            "acquisition": {"id": "acq_1"}
-                        },
-                        "nodes": [
-                            {
-                                "id": "A01_1",
-                                "type": "multiscale",
-                                "name": "A01_1",
-                                "path": {
-                                    "type": "zarr",
-                                    "path": "./A/01/002.img"
-                                }
-                            },
-                            {
-                                "type": "multiscale",
-                                "name": "A01_1_nuclei",
-                                "path": {
-                                    "type": "zarr",
-                                    "path": "./A/01/002_nuclei.img"
-                                },
-                                "attributes": {
-                                    "labels": {
-                                        "source": [{"id": "A01_1"}]
-                                    }
-                                }
-                            }
-                        ]
-                    }
-                ]
-            }
-        ]
-    }
-}
-```
-
-While inlined plate collections are shown above for simplicity, an on-disk plate collection could still refer to separate on-disk collections within each well that carry a `well` attribute.
-
-#### `bioformats2raw.layout` metadata
-
-The `bioformats2raw.layout` metadata is replaced by this proposal.
-A series of images can now be represented as a collection of multiscale images.
 
 ## Extensions
 
@@ -1057,7 +888,8 @@ That is left to be defined on a case-by-case basis for individual key specificat
 ```jsonc
     "path": {
         "type": "myorg:zip",
-        "path": "./mylab.zip"
+        "format": "relative",
+        "href": "./mylab.zip"
     }
 ```
 
@@ -1193,8 +1025,7 @@ While the segmentation would now be published on its own, it could still be publ
 When processing images in the OME-Zarr format, a diversity of derived data like segmentation, probability maps, meshes, tables and other formats can be generated.
 This proposal does not intend to provide a specification to all these datatypes, but to define the metadata of how related data in Zarr or other formats can be linked to OME-Zarr images.
 
-Because there is already a specification for labels in the spec, the label definition is broadened by this spec.
-For other datatypes like tables, [past proposals](https://github.com/ome/ngff/pull/64) have focused on how tables can be serialised to OME-Zarr.
+For  past proposals that have proposed adding datatypes such as [tables](https://github.com/ome/ngff/pull/64) have focused on how tables can be serialised to OME-Zarr.
 As these proposals did not proceed to become part of the OME-Zarr spec, different implementers have built their own sub-specs for tables (see e.g. the [ngio table definition](https://fractal-analytics-platform.github.io/ngio/v0.3.2/table_specs/overview/) coming from the Fractal project or the [label table](https://mobie.github.io/specs/mobie_spec.html#table-data) in MoBIE).
 While future proposals and extensions may define datatypes like tables more strictly, this proposal offers a general way to make such additional data types discoverable.
 
@@ -1241,7 +1072,8 @@ Also note some MoBIE specific attributes:
                         "type": "multiscale",
                         "path": {
                           "type": "zarr",
-                          "path": "https://janelia-cosem-datasets.s3.amazonaws.com/jrc_hela-3/jrc_hela-3.zarr/em/fibsem-uint16",
+                          "format": "http",
+                          "href": "https://janelia-cosem-datasets.s3.amazonaws.com/jrc_hela-3/jrc_hela-3.zarr/em/fibsem-uint16",
                         }
                     },
                     {
@@ -1249,11 +1081,9 @@ Also note some MoBIE specific attributes:
                         "type": "multiscale",
                         "path": {
                           "type": "zarr",
-                          "path": "https://janelia-cosem-datasets.s3.amazonaws.com/jrc_hela-3/jrc_hela-3.zarr/labels/mito_seg",
+                          "format": "http",
+                          "href": "https://janelia-cosem-datasets.s3.amazonaws.com/jrc_hela-3/jrc_hela-3.zarr/labels/mito_seg",
                         },
-                        "attributes": {
-                            "labels": {}
-                        }
                     }
                 ]
             },
@@ -1266,7 +1096,8 @@ Also note some MoBIE specific attributes:
                         "type": "multiscale",
                         "path": {
                           "type": "zarr",
-                          "path": "https://janelia-cosem-datasets.s3.amazonaws.com/jrc_macrophage-2/jrc_macrophage-2.zarr/em/fibsem-uint16"
+                          "format": "http",
+                          "href": "https://janelia-cosem-datasets.s3.amazonaws.com/jrc_macrophage-2/jrc_macrophage-2.zarr/em/fibsem-uint16"
                         }
                     },
                     {
@@ -1274,11 +1105,9 @@ Also note some MoBIE specific attributes:
                         "type": "multiscale",
                         "path": {
                           "type": "zarr",
-                          "path": "https://janelia-cosem-datasets.s3.amazonaws.com/jrc_macrophage-2/jrc_macrophage-2.zarr/labels/mito_seg"
+                          "format": "http",
+                          "href": "https://janelia-cosem-datasets.s3.amazonaws.com/jrc_macrophage-2/jrc_macrophage-2.zarr/labels/mito_seg"
                         },
-                        "attributes": {
-                            "labels": {}
-                        }
                     }
                 ]
             },
@@ -1291,7 +1120,8 @@ Also note some MoBIE specific attributes:
                         "type": "multiscale",
                         "path": {
                           "type": "zarr",
-                          "path": "https://janelia-cosem-datasets.s3.amazonaws.com/jrc_jurkat-1/jrc_jurkat-1.zarr/em/fibsem-uint16"
+                          "format": "http",
+                          "href": "https://janelia-cosem-datasets.s3.amazonaws.com/jrc_jurkat-1/jrc_jurkat-1.zarr/em/fibsem-uint16"
                         }
                     },
                     {
@@ -1299,11 +1129,9 @@ Also note some MoBIE specific attributes:
                         "type": "multiscale",
                         "path": {
                           "type": "zarr",
-                          "path": "https://janelia-cosem-datasets.s3.amazonaws.com/jrc_jurkat-1/jrc_jurkat-1.zarr/labels/mito_seg"
+                          "format": "http",
+                          "href": "https://janelia-cosem-datasets.s3.amazonaws.com/jrc_jurkat-1/jrc_jurkat-1.zarr/labels/mito_seg"
                         },
-                        "attributes": {
-                            "labels": {}
-                        }
                     }
                 ]
             }
@@ -1335,15 +1163,22 @@ https://github.com/normanrz/ngff-rfc8-collection-examples/.
             "type": "singlescale",
             "path": {
               "type": "zarr",
-              "path": "./s0"
+              "format": "relative",
+              "href": "./s0"
             },
             "attributes": {
               "coordinateTransformations": [
                 {
                   "type": "scale",
                   "scale": [1, 1, 1],
-                  "input": {"id": "01a13e2d-8ae2-7519-a28f-7b278247ca30"},
-                  "output": {"id": "01a13e2f-a19f-7735-9802-e48c70b1a089"}
+                  "input": {
+                    "type": "singlescale",
+                    "ref": "01a13e2d-8ae2-7519-a28f-7b278247ca30"
+                  },  // references s0
+                  "output": {
+                    "type": "coordinate_system",
+                    "ref": "01a13e2f-a19f-7735-9802-e48c70b1a089"
+                  }  // references 'physical', below
                 }
               ]
             }
@@ -1352,6 +1187,7 @@ https://github.com/normanrz/ngff-rfc8-collection-examples/.
         "attributes": {
           "coordinateSystems": [
             {
+              "type": "coordinate_system",
               "id": "01a13e2f-a19f-7735-9802-e48c70b1a089",
               "name": "physical",
               "axes": [...]
@@ -1365,6 +1201,7 @@ https://github.com/normanrz/ngff-rfc8-collection-examples/.
 ### A multiscale group with a single resolution level
 
 The multiscale group contains the following metadata:
+
 ```jsonc
 {
     "ome": {
@@ -1379,13 +1216,15 @@ The multiscale group contains the following metadata:
             "type": "singlescale",
             "path": {
               "type": "zarr",
-              "path": "./s0"
+              "format": "relative",
+              "href": "./s0"
             },
           }
         ],
         "attributes": {
           "coordinateSystems": [
             {
+              "type": "coordinate_system",
               "id": "01a13e3c-4f9e-760c-87bc-61b13430de55",
               "name": "physical",
               "axes": [...]
@@ -1397,6 +1236,7 @@ The multiscale group contains the following metadata:
 ```
 
 And the `zarr.json` at the location of the resolution level (`./s0/zarr.json`) contains the following metadata:
+
 ```jsonc
 {
     "ome": {
@@ -1409,13 +1249,18 @@ And the `zarr.json` at the location of the resolution level (`./s0/zarr.json`) c
             {
               "type": "scale",
               "scale": [1, 1, 1],
-              "input": {"id": "01a13e3c-13a5-7461-b9ba-3393039199b6"},
+              "input": {
+                "type": "singlescale",
+                "ref": "01a13e3c-13a5-7461-b9ba-3393039199b6"
+              },
               "output": {
-                "id": "01a13e3c-4f9e-760c-87bc-61b13430de55",
+                "type": "coordinate_system",
+                "ref": "01a13e3c-4f9e-760c-87bc-61b13430de55",
                 "path": {
                   "type": "json",
-                  "path": "../zarr.json"
-                }
+                  "format": "relative",
+                  "href": "../zarr.json"
+                }  // references "physical" in upstream zarr.json
               }
             }
           ]
@@ -1425,6 +1270,7 @@ And the `zarr.json` at the location of the resolution level (`./s0/zarr.json`) c
 ```
 
 ### A collection with a multiscale and a nested collection
+
 ```jsonc
 {
     "ome": {
@@ -1437,7 +1283,8 @@ And the `zarr.json` at the location of the resolution level (`./s0/zarr.json`) c
             "type": "multiscale",
             "path": {
               "type": "zarr",
-              "path": "./raw", // a relative or absolute path
+              "format": "relative",
+              "href": "./raw",
             },
             "attributes": {
                 "example-viewer:settings": {
@@ -1451,7 +1298,8 @@ And the `zarr.json` at the location of the resolution level (`./s0/zarr.json`) c
               "type": "collection",
               "path": {
                 "type": "json",
-                "path": "./nested_collection.json"
+                "format": "relative",
+                "href": "./nested_collection.json"
               }
           }, ...
         ],
@@ -1483,7 +1331,8 @@ And the `zarr.json` at the location of the resolution level (`./s0/zarr.json`) c
                 "type": "singlescale",
                 "path": {
                   "type": "zarr",
-                  "path": "./raw/0"
+                  "format": "relative",
+                  "href": "./raw/0"
                 }
               }
             ],
@@ -1492,12 +1341,19 @@ And the `zarr.json` at the location of the resolution level (`./s0/zarr.json`) c
                 {
                   "type": "scale",
                   "scale": [1, 1, 1],
-                  "input": {"id": "01a13e41-0673-7318-96ca-f56480904ce0"},
-                  "output": {"id": "01a13e41-6a7e-77e5-aa09-f0017d392a6b"}
+                  "input": {
+                    "type": "singlescale",
+                    "ref": "01a13e41-0673-7318-96ca-f56480904ce0"
+                  },
+                  "output": {
+                    "type": "coordinate_system",
+                    "ref": "01a13e41-6a7e-77e5-aa09-f0017d392a6b"
+                  }
                 }
               ],
               "coordinateSystems": [
                 {
+                  "type": "coordinate_system",
                   "id": "01a13e41-6a7e-77e5-aa09-f0017d392a6b",
                   "name": "physical",
                   "axes": [...]
@@ -1927,6 +1783,14 @@ Webknossos uses a JSON format to define "datasets", which is a non-nestable coll
 ### STAC
 from the Geo Community https://stacindex.org/ https://stacspec.org/
 
+### Separate declaration and reference keys
+
+Several existing formats use different keys for declaring an object and for referring to it, as the [declarations](#declaration-interface) and [references](#reference-interface) in this RFC do:
+
+- **[OME-XML](https://www.openmicroscopy.org/Schemas/)** declares objects with an `ID` attribute (e.g. `<Image ID="Image:0">`) and refers to them with dedicated `…Ref` elements (e.g. `<ImageRef ID="Image:0"/>`).
+- **[FHIR](https://hl7.org/fhir/references.html)** declares resources with an `id` and refers to them with a `Reference` data type whose `reference` field names the type and ID of the target (e.g. `"reference": "Patient/123"`).
+- **[STAC](https://github.com/radiantearth/stac-spec)** declares catalogs, collections and items with an `id` and links between them with link objects that carry an `href` and a `rel` describing the relationship.
+
 ### BIDS
 https://direct.mit.edu/imag/article/doi/10.1162/imag_a_00103/119672/The-Past-Present-and-Future-of-the-Brain-Imaging
 
@@ -2045,7 +1909,7 @@ The collections mechanism is a possibility for extending OME-Zarr in a backwards
 Future additions include:
 
 - Additional node types, such as tables, meshes
-- Additional path types, such as S3 URLs
+- Additional path formats, such as S3 URLs
 
 Within the collections proposal, there are also opportunities for standardizing further metadata:
 
@@ -2078,7 +1942,9 @@ merely provides additional information.
 
 ## Performance
 
-**Multiple requests to collect metadata.** Assembling a collection from path-referenced nodes requires one metadata request per node (fetching the `zarr.json` of each referenced Zarr group or the standalone JSON file). For large collections or high-latency storage backends (e.g. S3, HTTP), this can result in significant startup latency. Implementations MAY mitigate this by fetching node metadata in parallel and SHOULD consider caching resolved node metadata. Future RFCs may introduce a consolidated metadata format to reduce round trips.
+**Multiple requests to collect metadata.** Assembling a collection from path-referenced nodes requires one metadata request per node (fetching the `zarr.json` of each referenced Zarr group or the standalone JSON file). For large collections or high-latency storage backends (e.g. S3, HTTP), this can result in significant startup latency. Implementations MAY mitigate this by fetching node metadata in parallel and SHOULD consider caching resolved node metadata.
+Writers MAY additionally use Zarr consolidated metadata to bundle the `zarr.json` documents of referenced nodes into the root group, so that readers can load the whole tree in one request (see [Consolidated metadata](#consolidated-metadata-non-normative)).
+The individual `zarr.json` files remain the source of truth.
 
 <!--
 What impact will this proposal have on performance? What benchmarks should we
@@ -2098,17 +1964,8 @@ is still a design), how will you track that these will be created?
 
 ### Backwards compatible
 
-This proposal is intended to replace the existing labels, HCS and
-bioformats2raw.layout structures with the new extensibility framework. The
-proposed structures do not yet provide full backwards-compatible coverage of
-all information represented by these existing formats. For example, some
-information currently represented by HCS or bioformats2raw.layout is not yet
-represented in the proposed structures.
-
-These gaps are intended to be addressed through further discussion and, where
-appropriate, through extensions to the framework. The community is encouraged
-to contribute such extensions so that existing metadata can be represented
-without loss, together with appropriate upgrade mechanisms for existing data.
+The v1.0 goal is to replace the existing labels, HCS and
+bioformats2raw.layout structures with the new extensibility framework. Expressing these data using RFC-8 extensibility framework will be discussed in topic-specific sub-RFCs. See the "Features deferred to subsequent sub-RFC” section for details.
 
 ### Forward compatible
 Existing implementations need to be updated to be able to understand the new collection objects.
@@ -2155,22 +2012,14 @@ Most RFCs will not need to consider all the following issues. They are included 
 
 ### Security
 
-This proposal allows collection metadata to reference arbitrary paths, including relative paths, absolute file system paths, and remote URLs.
-This introduces several security considerations that implementations MUST address.
+This proposal allows collection metadata to reference other metadata documents through `Path` objects.
+The core of this RFC only defines the `relative` path format, which introduces the security considerations below that implementations MUST address.
 
 **Path traversal.** Relative paths (e.g. `../../sensitive/data`) may be used to reference files outside the intended storage scope.
 Implementations SHOULD validate that resolved paths remain within an expected root directory or storage namespace, and MUST NOT follow paths that escape a defined sandbox without explicit user consent.
 
-**Server-side request forgery (SSRF).** Remote URLs (HTTP/HTTPS) embedded in collection metadata may cause implementations to issue requests to unintended or internal network endpoints.
-Implementations SHOULD restrict which hosts or URL schemes are permitted, and SHOULD NOT automatically fetch remote paths without user awareness.
-
-**Confused deputy / cross-origin data access.** A collection file from one origin may reference data from another origin.
-Implementations SHOULD apply appropriate same-origin or cross-origin access controls and MUST communicate to the user when data is being loaded from a different origin than the collection itself.
-
-**Untrusted collection files.** Collection metadata read from untrusted sources (e.g. files downloaded from the internet, shared links) may contain malicious paths.
-Implementations SHOULD treat collection files from untrusted sources with caution, ideally prompting the user before resolving any external or absolute paths.
-
-**User communication.** Clients SHOULD clearly indicate to the user which remote or external paths are being accessed as a result of loading a collection, so that users can make informed decisions about data access and privacy.
+**Resource exhaustion.** Cyclic or very deeply nested paths may cause implementations to issue an unbounded number of requests.
+Implementations MUST detect cycles as described in [Path resolution](#path-resolution) and MAY limit the depth to which they resolve nested paths.
 
 <!--
 What impact will this proposal have on security? Does the proposal require a
