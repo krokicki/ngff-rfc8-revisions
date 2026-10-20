@@ -1009,6 +1009,44 @@ In this example, two OME-Zarr viewers, “Viewer A” and “Viewer B” each ha
 }
 ```
 
+## Type tiers
+
+All object types that may be found in a OME-Zarr JSON file ultimately belong to one of two categories: **built-in types**, which are defined by the OME-Zarr specification, and **custom types**, which are defined by [extensions](#extensions).
+
+Built-in types are identified by a specification-defined keyword, while custom types are identified by an identifier derived from the identifier of the extension that defines them, as explained in the [“Extensions” section](#extension-and-custom-type-identifiers).
+
+Built-in types can further be subdivided into **core types**, **recommended types**, and **optional**. As the name suggests, the difference between the two categories lies in what is required from OME-Zarr implementations: a compliant OME-Zarr implementation MUST support all core types, SHOULD support recommended types, and MAY support optional types.
+
+Custom types are initially all OPTIONAL. However, future revisions of the specification may promote a particular custom type to the level of a recommended type, if there is agreement within the community (through the specification revision process, that is RFCs) that the custom type is well designed, useful, and widespread enough to warrant such a promotion.
+
+The following table recapitulates the currently defined built-in types along with their assigned tier.
+
+| Type name | Type of… | Tier | Origin |
+| - | - | - | - |
+| `collection` | Node | Core type | This RFC |
+| `multiscale` | Node | Core type | This RFC |
+| `zarr` | Path | Core type | This RFC |
+| `json` | Path | Core type | This RFC |
+| `scene` | Trait | Core type | This RFC |
+| `array` | Axe | Core type | RFC-5 |
+| `space` | Axe | Core type | RFC-5 |
+| `time` | Axe | Core type | RFC-5 |
+| `channel` | Axe | Core type | RFC-5 |
+| `coordinate` | Axe | Core type | RFC-5 |
+| `identity` | Coordinate transformation | Core type | RFC-5 |
+| `scale` | Coordinate transformation | Core type | RFC-5 |
+| `translation` | Coordinate transformation | Core type | RFC-5 |
+| `mapAxis` | Coordinate transformation | Recommended type | RFC-5 |
+| `affine` | Coordinate transformation | Recommended type | RFC-5 |
+| `rotation` | Coordinate transformation | Recommended type | RFC-5 |
+| `sequence` | Coordinate transformation | Optional | RFC-5 |
+| `displacements` | Coordinate transformation | Optional | RFC-5 |
+| `coordinates` | Coordinate transformation | Optional | RFC-5 |
+| `bijection` | Coordinate transformation | Optional | RFC-5 |
+| `byDimension` | Coordinate transformation | Optional | RFC-5 |
+
+Any future RFC that defines its own types MUST explicitly state for each type whether it is intended that implementations MUST support it (categorizing it as a core type), SHOULD support it (categorizing it as a recommended type), or MAY support it (categorizing it as an optional type). A type defined without such an explicit statement is inferred to be an optional type.
+
 ## User stories
 
 ### 1. Visualize multiple images at once
