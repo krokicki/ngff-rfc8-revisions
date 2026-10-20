@@ -688,11 +688,11 @@ under Damien's proposal
 
 ## Extensions
 
-This section describes an extensibility mechanism by which anyone can unilateraly extend the OME-Zarr specification and store, under the `ome` attributes in the `zarr.json` file, additional metadata that were not envisioned by the specification, all the while maintaining interoperability with OME-Zarr applications.
+This section describes an extensibility mechanism by which anyone can unilateraly extend the OME-Zarr specification and store, under the `ome` attributes of a `zarr.json` file (or any standalone JSON file), additional metadata that were not envisioned by the specification, all the while maintaining interoperability with OME-Zarr applications.
 
 The basic principle is that an extension compliant with this extensibility mechanism can extend the specification by **defining additional, custom types**. An OME-Zarr extension is therefore essentially a set of custom types.
 
-Note: We acknowledge that, since most if not all OME-Zarr implementations are inherently “permissive” (in that they will silently ignore anything that they don’t recognize or don’t expect within a `zarr.json` file), it is already possible for anyone to store additional metadata and create _de facto_ their own extension of OME-Zarr. However, without adhering to the rules of an established extensibility mechanism, such extensions do not provide any guarantee of interoperability. In the rest of this document, the word “extension” will be understood as referring strictly to “an extension compliant with the proposed extensibility mechanism”, ignoring all other possibilities of extensions.
+Note: We acknowledge that, since most if not all OME-Zarr implementations are inherently “permissive” (in that they will silently ignore anything that they don’t recognize or don’t expect in a JSON file), it is already possible for anyone to store additional metadata and create _de facto_ their own extension of OME-Zarr. However, without adhering to the rules of an established extensibility mechanism, such extensions do not provide any guarantee of interoperability. In the rest of this document, the word “extension” will be understood as referring strictly to “an extension compliant with the proposed extensibility mechanism”, ignoring all other possibilities of extensions.
 
 ### Extension and custom type identifiers
 
@@ -714,14 +714,14 @@ For example, the [`Path` interface](#path-interface) proposed by this very RFC h
 
 ### Extension manifest
 
-Any `zarr.json` file that makes use of extension-defined custom types MUST declare an extension manifest, which MUST list every extension used within the file. The manifest is stored under the `extensionManifest` key of the `ome` object.
+Any JSON file that makes use of extension-defined custom types MUST declare an extension manifest, which MUST list every extension used within the file. The manifest is stored under the `extensionManifest` key of the `ome` object.
 
 The extension manifest has several purposes, all stemming from the intention of making extensions “manageable”. Notably, it is intended to:
 
 - allow figuring out at a glance (1) whether an OME-Zarr image is making use of extensions at all, and (2) if so, which extensions are being used;
 - provide informations about an extension, including pointers to human-readable documentation and machine-readable schemas.
 
-When the metadata of an OME-Zarr image are spread over several `zarr.json` files in different Zarr groups, each `zarr.json` file MUST carry its own manifest, listing the extensions used in that file. Additionally, the manifest in the root-level `zarr.json` file SHOULD list every extension used in any of the downstream `zarr.json` files, so that a reader can find out which extensions are being used in an entire image without having to check all the `zarr.json` files in the Zarr hierarchy.
+When the metadata of an OME-Zarr image are spread over several JSON files in different Zarr groups, each file MUST carry its own manifest, listing the extensions used in that file. Additionally, the manifest in the root-level `zarr.json` file SHOULD list every extension used in any of the downstream files, so that a reader can find out which extensions are being used in an entire image without having to check all the JSON files in the Zarr hierarchy.
 
 The manifest MUST be an array of extension objects. Each listed extension MUST be an object with the following fields:
 
