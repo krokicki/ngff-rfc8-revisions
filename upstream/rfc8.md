@@ -373,7 +373,7 @@ Objects that implement `Node` have the following fields:
 | - | - | - | - |
 | `"type"` | string | yes | Value MUST be a string identifying the node type. |
 | `"id"` | string | yes | Value MUST be a UUID, MUST be unique within the JSON document, and SHOULD be a UUIDv7+. |
-| `"name"` | string | no | Value MUST be a non-empty string intended for human-readable display. Names MAY be unique within the enclosing collection. |
+| `"name"` | string | no | Value MUST be a non-empty string intended for human-readable display. |
 | `"traits"` | object | no | Value MUST be a dictionary. [See traits section](#traits) |
 
 (rfcs:rfc8:abstract-structure-node-field-type)=
@@ -540,7 +540,7 @@ referenced by paths instead of relying on a file system hierarchy.
 | - | - | - | - |
 | `"type"` | string | yes | Value MUST be `"collection"`. |
 | `"id"` | string | yes | Value MUST be a UUID, MUST be unique within the JSON document, and SHOULD be a UUIDv7+. |
-| `"name"` | string | no | Value MUST be a non-empty string intended for human-readable display. Names MAY be unique within the enclosing collection. |
+| `"name"` | string | no | Value MUST be a non-empty string intended for human-readable display. |
 | `"nodes"` | array | no | Value MUST be an array of `Node` objects. |
 | `"path"` | object | no | Value MUST be a `Path` object. |
 | `"traits"` | object | no | Value MUST be a dictionary. [See traits section](#traits). |
@@ -582,7 +582,7 @@ This new interface replaces the dataset metadata defined in the previous version
 | - | - | - | - |
 | `"type"` | string | yes | Value MUST be `"singlescale"`. |
 | `"id"` | string | yes | Value MUST be a UUID, MUST be unique within the JSON document, and SHOULD be a UUIDv7+. |
-| `"name"` | string | no | Value MUST be a non-empty string intended for human-readable display. Names MAY be unique within the enclosing collection. |
+| `"name"` | string | no | Value MUST be a non-empty string intended for human-readable display. |
 | `"path"` | object | no | Value MUST be a `Path` object. |
 | `"attributes"` | object | yes | Value MUST be a dictionary. [See attributes section](#attributes). Required because it MUST contain `coordinateTransformations`.|
 
@@ -629,7 +629,7 @@ This new interface replaces the multiscale metadata defined in the previous vers
 | - | - | - | - |
 | `"type"` | string | yes | Value MUST be `"multiscale"`. |
 | `"id"` | string | yes | Value MUST be a UUID, MUST be unique within the JSON document, and SHOULD be a UUIDv7+. |
-| `"name"` | string | no | Value MUST be a non-empty string intended for human-readable display. Names MAY be unique within the enclosing collection. |
+| `"name"` | string | no | Value MUST be a non-empty string intended for human-readable display. |
 | `"nodes"` | array | no | Value MUST be an array of `Singlescale` objects. |
 | `"path"` | object | no | Value MUST be a `Path` object. |
 | `"traits"` | object | yes | Value MUST be a dictionary. [See traits section](#traits). Required because it MUST contain `coordinateSystems`.|
