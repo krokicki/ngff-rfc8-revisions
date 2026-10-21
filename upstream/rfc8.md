@@ -1080,17 +1080,17 @@ In this example, a `https://ngff.example.com/transforms/` extension defines a cu
                 "coordinateSystems": [
                     {
                         "id": "physical",
-                        "axes": {
-                            {"name": "y", "type": "space", units="micrometer"},
-                            {"name": "x", "type": "space", units="micrometer"}
-                        }
+                        "axes": [
+                            {"name": "y", "type": "space", "units": "micrometer"},
+                            {"name": "x", "type": "space", "units": "micrometer"}
+                        ]
                     },
                     {
                         "id": "registered",
-                        "axes": {
-                            {"name": "y", "type": "space", units="micrometer"},
-                            {"name": "x", "type": "space", units="micrometer"}
-                        }
+                        "axes": [
+                            {"name": "y", "type": "space", "units": "micrometer"},
+                            {"name": "x", "type": "space", "units": "micrometer"}
+                        ]
                     }
                 ],
                 "coordinateTransformations": [
@@ -1098,7 +1098,7 @@ In this example, a `https://ngff.example.com/transforms/` extension defines a cu
                         "type": "https://ngff.example.com/transforms/ThinPlateSpline",
                         "input": {"id": "physical"},
                         "output": {"id": "registered"},
-                        "controlPoints": {"type": "zarr", "path": "./tps/control_points"},
+                        "controlPoints": {"type": "zarr", "format": "relative", "href": "./tps/control_points"},
                         "regularization": 0.01
                 ]
             },
@@ -1148,7 +1148,7 @@ In this example, two OME-Zarr viewers, “Viewer A” and “Viewer B” each ha
             {
                 "name": "nuclei",
                 "type": "multiscale",
-                "path": {"type": "zarr", "path": "./nuclei"},
+                "path": {"type": "zarr", "format": "relative", "href": "./nuclei"},
                 "traits": [
                     {
                         "type": "https://viewer-a.example.com/settings/Layer",
