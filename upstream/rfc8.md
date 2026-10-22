@@ -394,14 +394,13 @@ Non-root `Node` objects SHOULD NOT have a `version` field and MUST NOT have a di
 (rfcs:rfc8:abstract-structure-traits)=
 #### Traits
 
-Each `Node` has a `traits` field that can be populated with JSON metadata.
-A primary use case for the `traits` field is the specialization of collections and nodes through additional metadata.
+Each `Node` has a `traits` field that accepts a list of `Trait` objects. A trait is an object that can be used to enrich any `Node` with arbitrary metadata. A primary use case for traits is the specialization of collections and nodes.
 
-Traits that are defined as part of this RFC or sub-RFCs are:
-- `coordinateSystems`
-- `coordinateTransformations`
+Each trait has minimally a `type` field, which dictates how the trait should be interpreted and defines the other fields it may contain.
 
-Trait keys within the `traits` dictionary of nodes are an extension point. Custom extensions can add prefixed keys (e.g., `neuroglancer:shader`, `webknossos:settings`). See [Extensions](#extensions) for more details.
+This RFC defines one type of trait: [`scene`](#scene-trait).
+
+Trait types are also an extension point, so any extension can define its own traits following the rules set forth in the [“Extensions” section](#extensions).
 
 #### Metadata storage
 
@@ -850,67 +849,364 @@ under Damien's proposal
 
 ## Extensions
 
-This section describes how existing classes and class attributes can be extended
-in a controlled manner, enabling custom functionality while maintaining interoperability.
+This section describes an extensibility mechanism by which anyone can unilateraly extend the OME-Zarr specification and store, under the `ome` attributes of a `zarr.json` file (or any standalone JSON file), additional metadata that were not envisioned by the specification, all the while maintaining interoperability with OME-Zarr applications.
 
-Extensions to the specification can be made at defined extension points, and
-they are declared using a prefix naming scheme.
+The basic principle is that an extension compliant with this extensibility mechanism can extend the specification by **defining additional, custom types**. An OME-Zarr extension is therefore essentially a set of custom types.
+
+Note: We acknowledge that, since most if not all OME-Zarr implementations are inherently “permissive” (in that they will silently ignore anything that they don’t recognize or don’t expect in a JSON file), it is already possible for anyone to store additional metadata and create _de facto_ their own extension of OME-Zarr. However, without adhering to the rules of an established extensibility mechanism, such extensions do not provide any guarantee of interoperability. In the rest of this document, the word “extension” will be understood as referring strictly to “an extension compliant with the proposed extensibility mechanism”, ignoring all other possibilities of extensions.
+
+### Extension and custom type identifiers
+
+An extension MUST have a unique identifier, which SHOULD be an absolute URI that SHOULD end with either `#` or `/`.
+
+All custom types defined by an extension MUST have their own unique identifier, which MUST be built by appending a type-specific suffix (the type’s _local name_, within the context of the extension that defines it) to the extension’s identifier.
+
+> For example, if an extension with the identifier `https://example.org/my-ngff-extension/` defined a new type of coordinate transformation named `NonLinearTransform`, the identifier for the new type would be `https://example.org/my-ngff-extension/NonLinearTransform`, with `NonLinearTransform` being the type’s local name.
 
 ### Extension points
 
-The extension system defines several points at which OME-Zarr can be extended
-while maintaining a common framework. These include node types, attribute keys,
-path types, coordinate transformation types, and coordinate system axis
-types. Each extension point is identified and declared in the
-corresponding sections of this proposal.
+Custom types can be used in lieu of existing types defined by the specification, at defined extension points.
 
+An extension point is a `type` field within an object where (1) the value of the `type` field dictates how the rest of the object is to be interpreted, and (2) the OME-Zarr specification explicitly states that the allowed values in the `type` field “MAY be extended” (exact phrasing does not matter as long as the intention is clear).
 
-### Naming scheme
+At such an extension point, a custom type may be used by specifying its identifier in the `type` field, in lieu of one the values allowed by the specification. The custom type, as defined by the extension it belongs to, will then dictate how the object is to be interpreted.
 
-Extension identifiers follow a prefixed vs unprefixed convention:
+For example, the [`Path` interface](#path-interface) proposed by this very RFC has an extension point: it has a `type` field defined as accepting two values (`zarr` and `json`); the value dictates how the entire `Path` object is to be interpreted; and the specification explicitly states it is an extension point. An extension could then define a new, custom type of `Path` object.
 
-- **Unprefixed identifiers** are reserved for the core specification and can only be added or modified through the RFC process.
-- **Prefixed identifiers** (separated by `:`) can be freely introduced by custom extensions without requiring an RFC. The prefix identifies the user or organization that introduces and maintains the extension. Prefixes SHOULD be registered in a central registry (a Github repository under the `ome` organization). Registration of a prefix claims maintainership for that prefix and provides a discoverable location for the specification of custom extensions.
-- The `ome:` prefix is reserved for official extensions that have not yet been incorporated into the core specification.
+### Extension manifest
 
-This naming scheme applies uniformly to all extension points. Implementations that do not recognize a prefixed extension point SHOULD treat the referenced value as opaque and MAY skip it or display it with a generic representation.
+Any JSON file that makes use of extension-defined custom types MUST declare an extension manifest, which MUST list every extension used within the file. The manifest is stored under the `extensionManifest` key of the `ome` object.
 
-Custom-prefixed keys can also be used to add additional sub-keys or behavior to existing unprefixed keys.
-This can be thought of as a way of achieving inheritance.
-For example, the `well` key in a `Node`'s `attributes` could be specialized by a `fractal:well` key that adds additional sub-keys or alters behavior.
-It is out-of-scope of this RFC to fully define the inheritance behavior.
-That is left to be defined on a case-by-case basis for individual key specifications and may be standardized in a future RFC.
+The extension manifest has several purposes, all stemming from the intention of making extensions “manageable”. Notably, it is intended to:
+
+- allow figuring out at a glance (1) whether an OME-Zarr image is making use of extensions at all, and (2) if so, which extensions are being used;
+- provide informations about an extension, including pointers to human-readable documentation and machine-readable schemas.
+
+When the metadata of an OME-Zarr image are spread over several JSON files in different Zarr groups, each file MUST carry its own manifest, listing the extensions used in that file. Additionally, the manifest in the root-level `zarr.json` file SHOULD list every extension used in any of the downstream files, so that a reader can find out which extensions are being used in an entire image without having to check all the JSON files in the Zarr hierarchy.
+
+The manifest MUST be an array of extension objects. Each listed extension MUST be an object with the following fields:
+
+| Field | Type | Required? | Notes |
+| - | - | - | - |
+| `"id"` | string | yes | Identifier for the extension. SHOULD be an absolute URI. MUST be unique within the manifest. |
+| `"version"` | string | yes | Version of the extension used in the document. |
+| `"name"` | string | no | Short human-readable name, for display. |
+| `"description"` | string | no | One-sentence human-readable description of the extension. |
+| `"mustUnderstand"` | boolean | no | Whether knowledge of this extension is required for faithful processing of the data. Default `false`. |
+| `"homepage"` | string | no | URL to a homepage or documentation page for the extension. |
+| `"schemas"` | list[Schema] | yes | Formal schemas describing the custom types defined by the extension. |
+
+Each item in the `schemas` list MUST be an object with the following fields:
+
+| Field | Type | Required? | Notes |
+| - | - | - | - |
+| `"type"` | string | yes | Value MUST be either `linkml` or `jsonschema`. |
+| `"url"` | string | yes | A URL pointing to the schema. |
+
+Future versions of this specification may add new types of schemas.
+
+#### Use of schemas
+
+An extension MUST provide at least one schema in one of the supported schema definition languages (currently `linkml` or `jsonschema`).
+
+When using a JSON-Schema, every custom object type defined by the extension MUST be formally described in an entry within the `$defs` key of the JSON-Schema, where the name of the entry MUST match the custom type’s local name.
+
+When using a LinkML schema, every custom object type defined by the extension MUST be formally described by a LinkML class definition whose name MUST match the custom type’s local name.
+
+Readers that do not explicitly support an extension MAY use the provided schema(s) to attempt to validate the extension’s data. If they do so, they SHOULD treat any validation error the same way as they would treat any non-compliant data.
+
+Viewers that do not explicitly support an extension MAY use the provided schema(s) to display the extension’s data in a meaningful way, for example by using any provided human-readable labels and descriptions for the objects and fields that make up the extension’s data.
+
+#### The `mustUnderstand` flag
+
+Some extensions are intended to only add non-essential information, such as a viewer’s display settings, or a description of how the image was acquired. A reader that ignores such extensions can still interpret the rest of the data correctly. Other extensions may change what the data _means_, e.g. a coordinate transformation the reader cannot apply, or pixel values that are not intensities. A reader that ignores those would be at risk at misleading its users. The `mustUnderstand` flag lets writers state which case applies for any given extension.
+
+When a reader encounters a custom type that (1) it does not explicitly support and (2) is defined by an extension whose `mustUnderstand` flag is set to `true`, the reader MUST NOT silently fall back to a generic interpretation of the object; it MAY skip the object and report it as unsupported; it MAY continue to interpret the rest of the dataset. When the custom type is a [trait](#traits), this paragraph applies to the object that is carrying the trait.
+
+Readers MAY use the extension manifest to decide up front whether an OME-Zarr image is likely to be fully supported, without waiting to encounter an unknown custom type.
+
+Writers SHOULD set `mustUnderstand: true` for a given extension only when ignoring the extension’s data would cause _incorrect_ interpretation, not merely _less complete_ interpretation.
 
 ### Examples
 
-#### A `Path` with an extension `type` value
+#### Extending the `Path` object
+
+This example illustrates an extension with ID `https://ngff.example.org/omero/` that adds a a custom type of `Path` that points to an image on an OMERO server rather than to a file.
 
 ```jsonc
-    "path": {
-        "type": "myorg:zip",
-        "format": "relative",
-        "href": "./mylab.zip"
+{
+    "ome": {
+        "version": "0.x",
+        "extensionManifest": [
+            {
+                "id": "https://ngff.example.org/omero/",
+                "version": "0.3",
+                "name": "OMERO connector extension for OME-Zarr",
+                "description": "An extension to allow referring to remote OMERO images from within a OME-Zarr image.",
+                "homepage": "https://ngff.example.org/omero/",
+                "schemas": [
+                    {
+                        "type": "jsonschema",
+                        "url": "https://schemas.ngff.example.org/omero/0.3/omero.json"
+                    }
+                ]
+            }
+        ],
+        "type": "collection",
+        "nodes": [
+            {
+                "name": "original-acquisition",
+                "type": "multiscale",
+                "path": {
+                    "type": "https://ngff.example.org/omero/OMEROPath",
+                    "href": "https://omero.example.org/webclient/?show=image-48213",
+                    "host": "omero.example.org",
+                    "port": 4064,
+                    "imageId": 48213
+                }
+            },
+            {
+                "name": "segmentation",
+                "type": "multiscale",
+                "path": {"type": "zarr", "format": "relative", "href": "./segmentation"}
+            }
+        ]
     }
+}
 ```
 
-#### A `coordinateTransformation` with an extension `type` value
+The JSON-Schema for that extension could be:
 
 ```jsonc
-"coordinateTransformations": [
-  {
-    "type": "translation",
-    "translation": [0, 0, 100],
-    ...
-  },
-  {
-    "type": "myorg:nonlinear",
-    ...
-  }
-]
+{
+    "$defs": {
+        "OMEROPath": {
+            "description": "A Path that points to an image on an OMERO server.",
+            "properties": {
+                "type": {
+                    "description": "The object's type",
+                    "type": "string"
+                },
+                "href": {
+                    "description": "Full URL to the image.",
+                    "type": "string"
+                },
+                "host": {
+                    "description": "The hostname of the OMERO server.",
+                    "type": "string"
+                },
+                "port": {
+                    "description": "The TCP port to use when connecting to the server.",
+                    "type": "number",
+                    "default": 4064
+                },
+                "imageId": {
+                    "description": "The ID of the image on the OMERO server.",
+                    "type": "number"
+                }
+            },
+            "required": [
+                "type",
+                "href",
+                "host",
+                "imageId"
+            ],
+            "type": "object"
+        }
+    }
+}
 ```
 
+A LinkML schema for the same extension, if one were provided, could be:
 
+```yaml
+id: https://ngff.example.org/omero/
+name: OMERO connector extension for OME-Zarr
+prefixes:
+    linkml: https://w3id.org/linkml/
+imports:
+    - linkml:types
+default_range: string
+classes:
+    OMEROPath:
+        description: A Path that points to an image on an OMERO server.
+        attributes:
+            type:
+                description: The object’s type.
+                required: true
+            href: 
+                description: Full URL to the image.
+                range: uri
+                required: true
+            host:
+                description: The hostname of the OMERO server.
+                required: true
+            port:
+                description: The TCP port to use when connecting to the server.
+                range: integer
+                ifabsent: int(4064)
+            imageId:
+                description: The ID of the image on the OMERO server.
+                range: integer
+                required: true
+```
 
+#### A custom `coordinateTransformation`
+
+In this example, a `https://ngff.example.com/transforms/` extension defines a custom type of coordinate transformation that uses the “thin plate spline” technique.
+
+```jsonc
+{
+    "ome": {
+        "version": "0.x",
+        "extensionManifest": [
+            {
+                "id": "https://ngff.example.com/transforms/",
+                "version": "0.1",
+                "name": "OME-Zarr additional transforms",
+                "description": "An extension providing additional coordinate transformations.",
+                "homepage": "https://example.com/ngff-extensions/transforms/",
+                "schemas": [
+                    {
+                        "type": "jsonschema",
+                        "url": "https://schemas.example.org/transforms/0.1/transforms.json"
+                    }
+                ]
+            }
+        ],
+        "type": "collection",
+        "traits": {
+            "scene": {
+                "coordinateSystems": [
+                    {
+                        "id": "physical",
+                        "axes": [
+                            {"name": "y", "type": "space", "units": "micrometer"},
+                            {"name": "x", "type": "space", "units": "micrometer"}
+                        ]
+                    },
+                    {
+                        "id": "registered",
+                        "axes": [
+                            {"name": "y", "type": "space", "units": "micrometer"},
+                            {"name": "x", "type": "space", "units": "micrometer"}
+                        ]
+                    }
+                ],
+                "coordinateTransformations": [
+                    {
+                        "type": "https://ngff.example.com/transforms/ThinPlateSpline",
+                        "input": {"id": "physical"},
+                        "output": {"id": "registered"},
+                        "controlPoints": {"type": "zarr", "format": "relative", "href": "./tps/control_points"},
+                        "regularization": 0.01
+                ]
+            },
+        "nodes": [ /* ... */ ]
+    }
+}
+```
+
+#### Viewer rendering states
+
+In this example, two OME-Zarr viewers, “Viewer A” and “Viewer B” each have their own extension providing a custom trait to store their own display settings for the same image.
+
+```jsonc
+{
+    "ome": {
+        "version": "0.x",
+        "extensionManifest": [
+            {
+                "id": "https://viewer-a.example.com/settings/",
+                "version": "0.1",
+                "name": "Viewer-A visualisation settings",
+                "description": "An extension to store Viewer A-specific settings into an OME-Zarr image",
+                "homepage": "https://viewer-a.example.com/",
+                "schemas": [
+                    {
+                        "type": "jsonschema",
+                        "url": "https://viewer-a.example.com/ngff/schemas/settings-0.1.json"
+                    }
+                ]
+            },
+            {
+                "id": "https://viewer-b.example.org/rendering/",
+                "version": "0.2",
+                "name": "Viewer-B visualisation settings",
+                "description": "An extension to store Viewer B-specific settings into an OME-Zarr image",
+                "homepage": "https://viewer-b.example.org/",
+                "schemas": [
+                    {
+                        "type": "jsonschema",
+                        "url": "https://viewer-b.example.org/ngff-embedded-settings.json"
+                    }
+                ]
+            }
+        ],
+        "type": "collection",
+        "nodes": [
+            {
+                "name": "nuclei",
+                "type": "multiscale",
+                "path": {"type": "zarr", "format": "relative", "href": "./nuclei"},
+                "traits": [
+                    {
+                        "type": "https://viewer-a.example.com/settings/Layer",
+                        "visible": true,
+                        "opacity": 1.0,
+                        "shader": "void main() { emitRGB(vec3(0.0, 0.0, toNormalized(getDataValue()))); }"                      
+                    },
+                    {
+                        "type": "https://viewer-b.example.org/rendering/Display",
+                        "colormap": "blue",
+                        "contrastLimits": [110, 3800],
+                        "gamma": 1.0,
+                        "blending": "additive"
+                    }
+                ]
+            }
+        ]
+    }
+}
+```
+
+## Type tiers
+
+All object types that may be found in a OME-Zarr JSON file ultimately belong to one of two categories: **built-in types**, which are defined by the OME-Zarr specification, and **custom types**, which are defined by [extensions](#extensions).
+
+Built-in types are identified by a specification-defined keyword, while custom types are identified by an identifier derived from the identifier of the extension that defines them, as explained in the [“Extensions” section](#extension-and-custom-type-identifiers).
+
+Built-in types can further be subdivided into **core types**, **recommended types**, and **optional**. As the name suggests, the difference between the two categories lies in what is required from OME-Zarr implementations: a compliant OME-Zarr implementation MUST support all core types, SHOULD support recommended types, and MAY support optional types.
+
+Custom types are initially all OPTIONAL. However, future revisions of the specification may promote a particular custom type to the level of a recommended type, if there is agreement within the community (through the specification revision process, that is RFCs) that the custom type is well designed, useful, and widespread enough to warrant such a promotion.
+
+The following table recapitulates the currently defined built-in types along with their assigned tier.
+
+| Type name | Type of… | Tier | Origin |
+| - | - | - | - |
+| `collection` | Node | Core type | This RFC |
+| `multiscale` | Node | Core type | This RFC |
+| `zarr` | Path | Core type | This RFC |
+| `json` | Path | Core type | This RFC |
+| `scene` | Trait | Core type | This RFC |
+| `array` | Axe | Core type | RFC-5 |
+| `space` | Axe | Core type | RFC-5 |
+| `time` | Axe | Core type | RFC-5 |
+| `channel` | Axe | Core type | RFC-5 |
+| `coordinate` | Axe | Core type | RFC-5 |
+| `identity` | Coordinate transformation | Core type | RFC-5 |
+| `scale` | Coordinate transformation | Core type | RFC-5 |
+| `translation` | Coordinate transformation | Core type | RFC-5 |
+| `mapAxis` | Coordinate transformation | Recommended type | RFC-5 |
+| `affine` | Coordinate transformation | Recommended type | RFC-5 |
+| `rotation` | Coordinate transformation | Recommended type | RFC-5 |
+| `sequence` | Coordinate transformation | Optional | RFC-5 |
+| `displacements` | Coordinate transformation | Optional | RFC-5 |
+| `coordinates` | Coordinate transformation | Optional | RFC-5 |
+| `bijection` | Coordinate transformation | Optional | RFC-5 |
+| `byDimension` | Coordinate transformation | Optional | RFC-5 |
+
+Any future RFC that defines its own types MUST explicitly state for each type whether it is intended that implementations MUST support it (categorizing it as a core type), SHOULD support it (categorizing it as a recommended type), or MAY support it (categorizing it as an optional type). A type defined without such an explicit statement is inferred to be an optional type.
 
 ## User stories
 
@@ -1539,6 +1835,18 @@ The learning curve would be higher than with a purpose-built format, without cor
 
 For these reasons, the RFC adopts a simpler custom format with a prefix-based naming scheme instead of JSON-LD.
 
+### Custom types identified by prefixed keywords
+
+An initial version of this RFC proposed that third parties could extend the specification by (1) registering an extension prefix into a registry maintained by the community and (2) prepend the registered prefix to any type name they wish to create.
+
+This was abandoned in favour of (1) mandating that custom types be identified by an identifier that is derived from an _extension_ identifier, where the extension is itself declared in the _extension manifest_; and (2) recommending that extension identifiers (and therefore custom type identifiers) be URI-based. This better meets the [desired characteristics](https://github.com/gouttegd/yamf-playground/blob/main/ome-zarr/EXTENSIBILITY_MANIFESTO.md#desired-characteristics-for-a-manageable-extensibility-mechanism) for OME-Zarr extensibility, as set forth in the June 2026 Heidelberg hackathon.
+
+### Prefixed attribute keys
+
+An initial version of this RFC proposed that third parties could append custom metadata to any node by adding prefixed keys to an `attributes` dictionary carried by every node, where the prefix has been previously registered into a registry maintained by the community (as for custom types, see previous section).
+
+This was abandoned in favour of the [trait](#traits) concept.
+
 
 <!--
 As RFCs evolve, it is common that there are ideas that are abandoned. Rather
@@ -1875,6 +2183,17 @@ Shortened version from https://gist.githubusercontent.com/will-moore/fe0e260544b
 }
 </pre>
 </details>
+
+### Rust traits
+
+[Traits](#traits), as used in this RFC, were inspired by the [concept of the same name](https://doc.rust-lang.org/book/ch10-02-traits.html) in the Rust programming language.
+
+### Extensions
+
+The design of the [extensibility mechanism](#extensions) was influenced by:
+
+- the [OME-Zarr Extensibility Manifesto](https://github.com/gouttegd/yamf-playground/blob/main/ome-zarr/EXTENSIBILITY_MANIFESTO.md), which is itself the result of a discussion that took place in a OME-Zarr hackathon held in Heidelberg in June 2026;
+- the [Proposal for a generic extensibility scheme](https://github.com/gouttegd/yamf-playground/blob/main/EXTENSIBILITY.md) – what this RFC calls a “trait” is essentially what that proposal called a “class extension”.
 
 <!--
 
