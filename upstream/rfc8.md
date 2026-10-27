@@ -1458,7 +1458,7 @@ Also note the presence of a MoBIE-specific extension, which adds a MoBIE-specifi
 ## Other Examples
 
 The examples below demonstrate combinations of various features in this
-proposal. Further example can be found under
+proposal. Further examples can be found under
 https://github.com/normanrz/ngff-rfc8-collection-examples/.
 
 ### A multiscale group with a single, inlined resolution level
