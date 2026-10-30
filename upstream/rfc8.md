@@ -1461,54 +1461,54 @@ The examples below demonstrate combinations of various features in this
 proposal. Further examples can be found under
 https://github.com/normanrz/ngff-rfc8-collection-examples/.
 
-### A multiscale group with a single, inlined resolution level
+### A multiscale group with a single resolution level
 
 ```jsonc
 {
-    "ome": {
-        "version": "0.x",
-        "type": "multiscale",
-        "name": "multiscales_example",
-        "id": "01a13e2d-61b2-7760-9c2a-1aef3d3eeed6",
-        "nodes": [
-          {
-            "id": "01a13e2d-8ae2-7519-a28f-7b278247ca30",
-            "name": "s0",
-            "type": "singlescale",
-            "path": {
-              "type": "zarr",
-              "format": "relative",
-              "href": "./s0"
-            },
-            "attributes": {
-              "coordinateTransformations": [
-                {
-                  "type": "scale",
-                  "scale": [1, 1, 1],
-                  "input": {
-                    "type": "singlescale",
-                    "ref": "01a13e2d-8ae2-7519-a28f-7b278247ca30"
-                  },  // references s0
-                  "output": {
-                    "type": "coordinate_system",
-                    "ref": "01a13e2f-a19f-7735-9802-e48c70b1a089"
-                  }  // references 'physical', below
-                }
-              ]
-            }
-          }
-        ],
+  "ome": {
+    "version": "0.x",
+    "type": "multiscale",
+    "name": "multiscales_example",
+    "id": "01a13e2d-61b2-7760-9c2a-1aef3d3eeed6",
+    "nodes": [
+      {
+        "id": "01a13e2d-8ae2-7519-a28f-7b278247ca30",
+        "name": "s0",
+        "type": "singlescale",
+        "path": {
+          "type": "zarr",
+          "format": "relative",
+          "href": "./s0"
+        },
         "attributes": {
-          "coordinateSystems": [
+          "coordinateTransformations": [
             {
-              "type": "coordinate_system",
-              "id": "01a13e2f-a19f-7735-9802-e48c70b1a089",
-              "name": "physical",
-              "axes": [...]
+              "type": "scale",
+              "scale": [1, 1, 1],
+              "input": {
+                "type": "singlescale",
+                "ref": "01a13e2d-8ae2-7519-a28f-7b278247ca30"
+              },  // references s0
+              "output": {
+                "type": "coordinate_system",
+                "ref": "01a13e2f-a19f-7735-9802-e48c70b1a089"
+              }  // references 'physical', below
             }
           ]
         }
+      }
+    ],
+    "attributes": {
+      "coordinateSystems": [
+        {
+          "type": "coordinate_system",
+          "id": "01a13e2f-a19f-7735-9802-e48c70b1a089",
+          "name": "physical",
+          "axes": [...]
+        }
+      ]
     }
+  }
 }
 ```
 
