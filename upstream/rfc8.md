@@ -855,7 +855,38 @@ This section describes an extensibility mechanism by which anyone can unilateral
 
 The basic principle is that an extension compliant with this extensibility mechanism can extend the specification by **defining additional, custom types**. An OME-Zarr extension is therefore essentially a set of custom types.
 
-Note: We acknowledge that, since most if not all OME-Zarr implementations are inherently “permissive” (in that they will silently ignore anything that they don’t recognize or don’t expect in a JSON file), it is already possible for anyone to store additional metadata and create _de facto_ their own extension of OME-Zarr. However, without adhering to the rules of an established extensibility mechanism, such extensions do not provide any guarantee of interoperability. In the rest of this document, the word “extension” will be understood as referring strictly to “an extension compliant with the proposed extensibility mechanism”, ignoring all other possibilities of extensions.
+### Rationale for OME-Zarr extensions
+
+We must acknowledge from the very beginning that, by its very naturem OME-Zarr is already _de facto_ extensible, even before the word “extensibility” makes it into the OME-Zarr specification. Anyone can craft an OME-Zarr fileset that contains data beyond what is described in the current version of the specification. Most if not all OME-Zarr readers are inherently “permissive”, in that they will silently ignore anything that they don’t recognise or don’t expect within an OME-Zarr fileset, so that the presence of additional data will typically not result in an unreadable fileset.
+
+However, if left unchecked, this _de facto_ extensibility could quickly become a barrier to interoperability. If every single creator of OME-Zarr filesets can singlehandedly come up with its own way of representing a particular piece of data, then there is a risk that a particular piece of data may be understandable only by the very same implementation that created it; or (arguably even worse) that a particular piece of data may be understood _differently_ by different implementations. Ultimately, OME-Zarr could end up as a file format that is interoperable in name only: everybody would be using OME-Zarr, but all in slightly incompatible ways.
+
+The solution to that risk is _not_ to “close down” OME-Zarr, to mandate implementations to be non-permissive and to consider that anything that is not explicitly allowed by the specification is forbidden. In fact, even if we wanted to do that, we would have little to no leverage to actually enforce such a policy. Instead, we believe the proper solution is for OME-Zarr to provide a built-in extensibility mechanism. There will be no _obligation_ for people willing to extend OME-Zarr to use the mechanism defined here (again, we would have very little leverage to enforce such an obligation anyway), but (voluntarily) using it would allow the OME-Zarr community to _manage_ the interoperability issues.
+
+The manageability aspect is important because an extensibility system alone cannot prevent (a) the risk of a fragmented ecosystem, with an uncontrolled proliferation of redundant extensions; (b) the risk of uninterpretable extensions, that cannot be understood beyond their originating implementations. Instead, the OME-Zarr community will need to take steps to actively monitor the extension ecosystem and intervene as needed to try avoiding redundant or concurrent extensions in favour of promoting cooperation.
+
+In short, we propose that OME-Zarr should offer a system of _manageable_ extensibility, which would be preferred over the _de facto_ extensibility that is already offered by the very nature of OME-Zarr.
+
+This proposal requires that extensions be treated as first-class objects within the OME-Zarr specification, which is the purpose of this section of the present RFC.
+
+In the rest of this document, the word “extension” will be understood as referring strictly to “an extension compliant with the proposed extensibility mechanism”, ignoring all other possibilities of extensions.
+
+#### Desired characteristics for OME-Zarr’s extensibility mechanism
+
+(Those characteristics are _not_ listed in any particular order.)
+
+1. Anyone can define an extension. Prior permission is not required.
+2. An extension can extend another extension, without arbitrary limits as to the “depth” of an extension chain.
+3. Data from an extension must be preserved by all implementations – including implementations that are not explicitly aware of that particular extension. OME-Zarr readers must be able to pass unknown extensions’ data down to their client code.
+4. Extensions must be unambiguously identifiable.
+5. An OME-Zarr reader must be able to quickly determine (and report to client code) the extensions that are being used within an OME-Zarr fileset, if any.
+6. OME-Zarr implementations must be able to unambiguously state which extensions they explicitly support, preferably in machine-readable form.
+7. Any extension must be clearly documented. The documentation must state what additional data the extension is intended to store, the purpose of such data, and where to find them.
+8. Any extension must provide a formal schema describing the shape of its data and allowing even an implementation that does not explicitly support the extension to perform basic validation of the extension’s data.
+9. An extension should have a way to self-declare how “important” the extension is for a correct understanding of the OME-Zarr fileset in which it is used.
+10. The extensibility mechanism must ensure the absence of naming conflicts between two extensions developed independently.
+11. There must be a reasonably straightforward way to “promote” an extension so that it becomes part of the next version of the OME-Zarr specification, if there is agreement among the OME-Zarr community (as reached, most likely, through the existing RFC process) about the usefulness of the extension.
+12. The promotion of an extension must not invalidate existing data created before the extension was promoted.
 
 ### Extension and custom type identifiers
 
@@ -2210,7 +2241,7 @@ Shortened version from https://gist.githubusercontent.com/will-moore/fe0e260544b
 
 The design of the [extensibility mechanism](#extensions) was influenced by:
 
-- the [OME-Zarr Extensibility Manifesto](https://github.com/gouttegd/yamf-playground/blob/main/ome-zarr/EXTENSIBILITY_MANIFESTO.md), which is itself the result of a discussion that took place in a OME-Zarr hackathon held in Heidelberg in June 2026;
+- the [OME-Zarr Extensibility Manifesto](https://github.com/gouttegd/yamf-playground/blob/main/ome-zarr/EXTENSIBILITY_MANIFESTO.md), which is itself the result of a discussion that took place in an OME-Zarr hackathon held in Heidelberg in June 2026; the [“Rationale” section](#rationale-for-ome-zarr-extensions) in the present RFC is essentially a condensed version of that document;
 - the [Proposal for a generic extensibility scheme](https://github.com/gouttegd/yamf-playground/blob/main/EXTENSIBILITY.md) – what this RFC calls a “trait” is essentially what that proposal called a “class extension”.
 
 <!--
